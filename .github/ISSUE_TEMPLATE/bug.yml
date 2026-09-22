@@ -1,0 +1,31 @@
+name: Bug Report
+description: Report unexpected behavior or an error
+title: "[Bug] "
+labels: ["type: bug"]
+body:
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. 
+        2.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Messages / Logs
+      render: shell
