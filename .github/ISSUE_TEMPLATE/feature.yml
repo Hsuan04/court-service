@@ -22,8 +22,42 @@ body:
     attributes:
       label: Acceptance Criteria
       placeholder: |
-        - [ ] With 100 concurrent booking requests for the same slot, exactly 1 succeeds
+        - [ ] With 1000 concurrent requests for a session of capacity 100, exactly 100 bookings succeed
         - [ ] Unit and integration tests pass
+    validations:
+      required: true
+  - type: dropdown
+    id: base_branch
+    attributes:
+      label: Base Branch
+      description: The branch to create from and merge back into
+      options:
+        - develop
+        - main
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: branch_type
+    attributes:
+      label: Branch Type
+      options:
+        - feat (new feature)
+        - fix (bug fix)
+        - perf (performance improvement)
+        - refactor (no behavior change)
+        - test (tests or load test scripts)
+        - docs (documentation)
+        - ci (CI/CD configuration)
+        - chore (maintenance, dependencies, tooling)
+    validations:
+      required: true
+  - type: input
+    id: branch_description
+    attributes:
+      label: Branch Description
+      description: "Short kebab-case description. Full branch name: <type>/<issue-number>-<description>"
+      placeholder: court-session-data-model
     validations:
       required: true
   - type: textarea
