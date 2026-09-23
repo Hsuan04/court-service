@@ -1,5 +1,9 @@
 spring:
   application:
     name: court-service
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
   flyway:
     locations: classpath:db/migration,classpath:db/seed
