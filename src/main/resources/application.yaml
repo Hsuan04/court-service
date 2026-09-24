@@ -7,3 +7,12 @@ spring:
       ddl-auto: validate
   flyway:
     locations: classpath:db/migration,classpath:db/seed
+
+management:
+  endpoint:
+    health:
+      show-components: always
+
+logging:
+  pattern:
+    level: "%5p [traceId=%X{traceId:-}]"
