@@ -16,3 +16,6 @@ jobs:
           java-version: "21"
           cache: maven
       - run: ./mvnw -B verify
+        env:
+          # Keep logs inside the workspace; the local profile's default path is a personal directory.
+          LOG_PATH: ./logs
