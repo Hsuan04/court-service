@@ -1,0 +1,13 @@
+# Benchmark profile: load tests. Only WARN and above are logged, and request and SQL logging
+# are switched off entirely, so their components are not even registered.
+logging:
+  level:
+    root: WARN
+    com.courtservice: WARN
+
+app:
+  logging:
+    request:
+      enabled: false
+    sql:
+      enabled: false
