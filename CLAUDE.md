@@ -12,10 +12,20 @@ The core problem: many members booking the same session at once must never excee
 ## Commands
 - Full build with all tests: `./mvnw verify`
 - Run a single test class: `./mvnw test -Dtest=ClassName`
-- Run locally: `./mvnw spring-boot:run` (Spring Boot Docker Compose starts PostgreSQL automatically)
+- Run locally: `./mvnw spring-boot:run -Dspring-boot.run.profiles=local` (Spring Boot Docker Compose starts PostgreSQL automatically)
+- Run locally with logs inside the project: `LOG_PATH=./logs ./mvnw spring-boot:run -Dspring-boot.run.profiles=local`
 - Reset local database: `docker compose down -v`
 - Swagger UI: http://localhost:8080/swagger-ui.html
 - Health check: http://localhost:8080/api/health
+
+## Configuration Profiles
+- `application.yaml`: settings shared by every profile, and the production defaults (JSON logs at INFO, request log summaries only, slow SQL only)
+- `local`: running the application on a developer machine and running the test suite (all tests run with this profile through the surefire configuration in `pom.xml`); text logs, `com.courtservice` at DEBUG, full request payloads and every SQL statement with parameters and timing
+- `dev`: the shared development server; JSON logs at INFO, lower slow-query threshold (50ms)
+- `benchmark`: load tests; only WARN and above, request and SQL logging disabled so their components are not registered
+- Committed configuration files must never contain secrets; use environment variables
+- The default log directory in `application-local.yaml` is a path on the author's machine; change it to your own path or set the `LOG_PATH` environment variable
+- CI sets `LOG_PATH=./logs`, so logs are written to `logs/` inside the project (ignored by Git)
 
 ## Development Workflow
 Follow these steps for every task, in order:
@@ -121,6 +131,13 @@ Package by feature under `com.courtservice`:
 - If only the id of an association is needed, read `getId()` from the proxy instead of fetching the entity
 - Use `getReferenceById` when an association is needed only to set a foreign key
 - Bulk deletes and updates use `@Modifying` queries, not derived `deleteBy` methods
+
+## Logging Conventions
+- Never log requests and responses manually in business code; `common/logging` logs every controller call (INFO summary, DEBUG payloads) and every SQL statement
+- Business code logs only meaningful business events, for example why a booking was rejected
+- Use parameterized logging; never log personal data or credentials
+- When adding a request or response field that holds a secret, add its name to `app.logging.request.masked-fields`
+- Run load tests with the `benchmark` profile, which disables request and SQL logging
 
 ## Comments and Documentation
 - Write all code comments and Javadoc in English

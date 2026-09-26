@@ -1,3 +1,6 @@
+# Settings shared by every profile. Values here are also the production defaults.
+# Profile files (application-<profile>.yaml) only override what differs.
+# Never put secrets in any committed configuration file; use environment variables instead.
 spring:
   application:
     name: court-service
@@ -19,5 +22,41 @@ management:
       show-components: always
 
 logging:
-  pattern:
-    level: "%5p [traceId=%X{traceId:-}]"
+  # JSON (Elastic Common Schema) on both console and file; MDC traceId becomes a JSON field.
+  structured:
+    format:
+      console: ecs
+      file: ecs
+  level:
+    com.courtservice: INFO
+  file:
+    name: ${LOG_PATH:./logs}/court-service.log
+  logback:
+    rollingpolicy:
+      # Uncompressed 10MB files capped at 500MB in total keeps roughly the newest 50 files.
+      file-name-pattern: ${LOG_PATH:./logs}/court-service-%d{yyyy-MM-dd}.%i.log
+      max-file-size: 10MB
+      total-size-cap: 500MB
+      max-history: 30
+
+app:
+  logging:
+    request:
+      enabled: true
+      excluded-paths:
+        - /api/health
+        - /actuator/**
+        - /v3/api-docs/**
+        - /swagger-ui/**
+        - /swagger-ui.html
+      masked-fields:
+        - password
+        - token
+        - secret
+        - authorization
+      max-payload-length: 1000
+    sql:
+      enabled: true
+      log-all-queries: false
+      slow-query-threshold-ms: 100
+      log-parameters: false

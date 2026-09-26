@@ -1,0 +1,31 @@
+# Local profile: running the application on a developer machine and running the test suite.
+#
+# The default log directory below is a path on the original author's machine. If you use this
+# profile, either change the default to a directory on your own machine or override it by
+# setting the LOG_PATH environment variable, for example:
+#   LOG_PATH=./logs ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+# CI sets LOG_PATH=./logs so that logs are written inside the project.
+#
+# This file is committed: it must never contain secrets.
+logging:
+  # Human-readable text instead of JSON; console and file share the same pattern.
+  structured:
+    format:
+      console: ""
+      file: ""
+  pattern:
+    console: "[%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}] [%5p] [traceId=%X{traceId:-}] [%t] %logger{40} : %m%n%wEx"
+    file: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p [traceId=%X{traceId:-}] [%t] %logger{40} : %m%n%wEx"
+  level:
+    com.courtservice: DEBUG
+  file:
+    name: ${LOG_PATH:/Users/lawrencecheng/Desktop/CourtService/log}/court-service.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${LOG_PATH:/Users/lawrencecheng/Desktop/CourtService/log}/court-service-%d{yyyy-MM-dd}.%i.log
+
+app:
+  logging:
+    sql:
+      log-all-queries: true
+      log-parameters: true

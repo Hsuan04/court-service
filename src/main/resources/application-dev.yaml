@@ -1,0 +1,8 @@
+# Dev profile: the shared development server.
+# Inherits JSON logging at INFO and summary-only request logging from application.yaml.
+# The slow-query threshold is lower than production: dev data volumes are small, so a query
+# taking 50ms already points at a problem such as an N+1 or a missing index.
+app:
+  logging:
+    sql:
+      slow-query-threshold-ms: 50
