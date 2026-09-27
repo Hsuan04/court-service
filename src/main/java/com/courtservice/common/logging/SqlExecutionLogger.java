@@ -34,6 +34,9 @@ public class SqlExecutionLogger implements QueryExecutionListener {
             .thenComparingInt(operation -> operation.getArgs()[0] instanceof Number index ? index.intValue() : 0)
             .thenComparing(operation -> String.valueOf(operation.getArgs()[0]));
 
+    private static final String NULL_VALUE = "null";
+    private static final String OUT_PARAMETER = "OUT";
+
     private final SqlLoggingProperties properties;
 
     /**
@@ -90,8 +93,22 @@ public class SqlExecutionLogger implements QueryExecutionListener {
     private static String describeParameters(List<ParameterSetOperation> operations) {
         return operations.stream()
                 .sorted(PARAMETER_ORDER)
-                .map(operation -> String.valueOf(operation.getArgs()[1]))
+                .map(SqlExecutionLogger::parameterValue)
                 .collect(Collectors.joining(", ", "[", "]"));
+    }
+
+    /**
+     * Returns the bound value of a parameter operation. For {@code setNull} and
+     * {@code registerOutParameter} the second argument is a {@link java.sql.Types} code, not a value.
+     */
+    private static String parameterValue(ParameterSetOperation operation) {
+        if (ParameterSetOperation.isSetNullParameterOperation(operation)) {
+            return NULL_VALUE;
+        }
+        if (ParameterSetOperation.isRegisterOutParameterOperation(operation)) {
+            return OUT_PARAMETER;
+        }
+        return String.valueOf(operation.getArgs()[1]);
     }
 
     static String rows(Object result) {
