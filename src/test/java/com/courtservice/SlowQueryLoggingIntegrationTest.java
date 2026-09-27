@@ -1,13 +1,15 @@
 package com.courtservice;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import com.courtservice.common.logging.CapturedLogEvents;
+import com.courtservice.common.logging.SqlExecutionLogger;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -20,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * With the production settings (only slow queries, threshold 100ms), a statement above the
  * threshold is logged at WARN with its trace id and a fast statement is not logged at all.
  */
-@ExtendWith(OutputCaptureExtension.class)
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(properties = {
         "app.logging.sql.log-all-queries=false",
@@ -34,13 +35,21 @@ class SlowQueryLoggingIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private CapturedLogEvents sqlLogs;
+
+    @BeforeEach
+    void captureSqlLogs() {
+        sqlLogs = CapturedLogEvents.attach(SqlExecutionLogger.class.getName());
+    }
+
     @AfterEach
-    void clearMdc() {
+    void cleanUp() {
+        sqlLogs.close();
         MDC.remove(TRACE_ID_KEY);
     }
 
     @Test
-    void onlyQueriesAboveTheThresholdAreLoggedAtWarn(CapturedOutput output) {
+    void onlyQueriesAboveTheThresholdAreLoggedAtWarn() {
         // given
         String traceId = "slow-" + UUID.randomUUID();
         MDC.put(TRACE_ID_KEY, traceId);
@@ -50,11 +59,13 @@ class SlowQueryLoggingIntegrationTest {
         jdbcTemplate.queryForObject("select 42", Integer.class);
 
         // then
-        List<String> sqlLines = output.getOut().lines()
-                .filter(line -> line.contains("SqlExecutionLogger") && line.contains("[traceId=" + traceId + "]"))
-                .toList();
-        assertThat(sqlLines).singleElement().satisfies(line -> assertThat(line)
-                .contains(" WARN ", "(threshold 100ms)", "select pg_sleep(0.2)")
-                .containsPattern("Slow SQL \\d{3,}ms"));
+        List<ILoggingEvent> events = sqlLogs.withTraceId(traceId);
+        assertThat(events).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.WARN);
+            assertThat(event.getFormattedMessage())
+                    .contains("(threshold 100ms)", "select pg_sleep(0.2)")
+                    .containsPattern("^Slow SQL \\d{3,}ms");
+        });
+        assertThat(events).noneSatisfy(event -> assertThat(event.getFormattedMessage()).contains("select 42"));
     }
 }

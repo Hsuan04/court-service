@@ -1,10 +1,8 @@
 package com.courtservice.common.logging;
 
+import ch.qos.logback.classic.Level;
 import com.courtservice.common.web.PageResponse;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -14,7 +12,6 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-@ExtendWith(OutputCaptureExtension.class)
 class PayloadFormatterTest {
 
     private static final List<String> MASKED_FIELDS = List.of("password", "token", "secret", "authorization");
@@ -124,13 +121,19 @@ class PayloadFormatterTest {
     }
 
     @Test
-    void serializationFailureDoesNotThrowAndLogsOneWarning(CapturedOutput output) {
-        // when / then
-        assertThatCode(() -> formatter.format(new Exploding())).doesNotThrowAnyException();
-        assertThat(formatter.format(new Exploding())).isEqualTo("<unserializable Exploding>");
-        assertThat(output.getOut().lines()
-                .filter(line -> line.contains("Could not serialize") && line.contains("Exploding")))
-                .hasSize(2)
-                .allSatisfy(line -> assertThat(line).contains("WARN").doesNotContain("boom"));
+    void serializationFailureDoesNotThrowAndLogsOneWarning() {
+        try (CapturedLogEvents logs = CapturedLogEvents.attach(PayloadFormatter.class.getName())) {
+            // when / then
+            assertThatCode(() -> formatter.format(new Exploding())).doesNotThrowAnyException();
+            assertThat(formatter.format(new Exploding())).isEqualTo("<unserializable Exploding>");
+            assertThat(logs.all())
+                    .hasSize(2)
+                    .allSatisfy(event -> {
+                        assertThat(event.getLevel()).isEqualTo(Level.WARN);
+                        assertThat(event.getFormattedMessage())
+                                .contains("Could not serialize", "Exploding")
+                                .doesNotContain("boom");
+                    });
+        }
     }
 }

@@ -1,17 +1,17 @@
 package com.courtservice;
 
+import com.courtservice.common.logging.CapturedLogEvents;
 import com.courtservice.common.logging.PayloadFormatter;
 import com.courtservice.common.logging.RequestLoggingAspect;
 import com.courtservice.common.logging.RequestLoggingInterceptor;
 import com.courtservice.common.logging.RequestLoggingPathMatcher;
 import com.courtservice.common.logging.SqlLoggingConfiguration;
 import net.ttddyy.dsproxy.support.ProxyDataSource;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
@@ -29,11 +29,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Simulates the benchmark profile's switches: with request and SQL logging disabled, none of
  * their components is registered and nothing is logged.
  */
-@ExtendWith(OutputCaptureExtension.class)
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(properties = {"app.logging.request.enabled=false", "app.logging.sql.enabled=false"})
 @AutoConfigureMockMvc
 class LoggingDisabledIntegrationTest {
+
+    private static final String LOGGING_PACKAGE = "com.courtservice.common.logging";
 
     @Autowired
     private ApplicationContext context;
@@ -43,6 +44,18 @@ class LoggingDisabledIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    private CapturedLogEvents loggingPackageLogs;
+
+    @BeforeEach
+    void captureLoggingPackage() {
+        loggingPackageLogs = CapturedLogEvents.attach(LOGGING_PACKAGE);
+    }
+
+    @AfterEach
+    void detachLoggingPackage() {
+        loggingPackageLogs.close();
+    }
 
     @Test
     void loggingComponentsAreNotRegistered() {
@@ -55,7 +68,7 @@ class LoggingDisabledIntegrationTest {
     }
 
     @Test
-    void apiCallProducesNoRequestOrSqlLog(CapturedOutput output) throws Exception {
+    void apiCallProducesNoRequestOrSqlLog() throws Exception {
         // given
         String traceId = "disabled-" + UUID.randomUUID();
 
@@ -68,7 +81,6 @@ class LoggingDisabledIntegrationTest {
                 .andExpect(status().isCreated());
 
         // then
-        assertThat(output.getOut().lines().filter(line -> line.contains(traceId)))
-                .noneSatisfy(line -> assertThat(line).containsAnyOf("RequestLogging", "SqlExecutionLogger"));
+        assertThat(loggingPackageLogs.withTraceId(traceId)).isEmpty();
     }
 }
