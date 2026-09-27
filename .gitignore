@@ -45,7 +45,6 @@ logs/
 .env
 .env.*
 !.env.example
-application-local.yml
 
 ### Local data ###
 .data/
