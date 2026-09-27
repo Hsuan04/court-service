@@ -138,6 +138,10 @@ Package by feature under `com.courtservice`:
 - Use parameterized logging; never log personal data or credentials
 - When adding a request or response field that holds a secret, add its name to `app.logging.request.masked-fields`
 - Run load tests with the `benchmark` profile, which disables request and SQL logging
+- The `local` profile's console uses a text pattern (`logging.pattern.console` in `application-local.yaml`); every other profile logs ECS JSON:
+    - Pattern: `[%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}] [%5p] [traceId=%X{traceId:-}] [%t] %logger{40} : %m%n%wEx`
+    - Example: `[2026-09-26T17:18:02.683Z] [ WARN] [traceId=slow-...] [main] c.c.common.logging.SqlExecutionLogger : Slow SQL 200ms (threshold 100ms) | select pg_sleep(0.2)`
+- Tests assert on logging events (Logback `ListAppender`, see `CapturedLogEvents`), never on formatted console text, so changing the pattern does not break them
 
 ## Comments and Documentation
 - Write all code comments and Javadoc in English
