@@ -112,7 +112,7 @@ public class MemberService {
         }
     }
 
-    private Member findMember(Long id) {
+    public Member findMember(Long id) {
         return memberRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(RESOURCE_NAME, id));
     }
