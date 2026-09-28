@@ -29,6 +29,8 @@
     <properties>
         <java.version>21</java.version>
         <datasource-proxy.version>1.11.0</datasource-proxy.version>
+        <!-- Timing-dependent load simulations stay out of the default build; clear with -Dsurefire.excludedGroups= -->
+        <surefire.excludedGroups>simulation</surefire.excludedGroups>
     </properties>
     <dependencies>
         <dependency>
@@ -138,6 +140,7 @@
                     <systemPropertyVariables>
                         <spring.profiles.active>local</spring.profiles.active>
                     </systemPropertyVariables>
+                    <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
             <plugin>
