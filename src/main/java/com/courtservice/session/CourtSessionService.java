@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -95,6 +96,13 @@ public class CourtSessionService {
         return toResponse(session);
     }
 
+    @Transactional
+    public CourtSession update(CourtSession courtSession) {
+        courtSessionRepository.saveAndFlush(courtSession);
+        log.info("Updated court session {}", courtSession.getCourt().getId());
+        return courtSession;
+    }
+
     /**
      * Deletes a court session.
      *
@@ -128,7 +136,7 @@ public class CourtSessionService {
         }
     }
 
-    private CourtSession findSession(Long id) {
+    public CourtSession findSession(Long id) {
         return courtSessionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(RESOURCE_NAME, id));
     }
@@ -137,5 +145,41 @@ public class CourtSessionService {
         return new CourtSessionResponse(session.getId(), session.getCourt().getId(), session.getSessionDate(),
                 session.getStartTime(), session.getEndTime(), session.getCapacity(), session.getBookedCount(),
                 session.getOpenAt(), session.getCloseAt(), session.getCreatedAt(), session.getUpdatedAt());
+    }
+
+    /**
+     * Overwrites booked_count with an absolute value.
+     * NOT atomic: used only by NaiveBookingStrategy to demonstrate lost updates.
+     */
+    @Transactional
+    public void overwriteBookedCount(Long id, int bookedCount) {
+        courtSessionRepository.overwriteBookedCount(id, bookedCount);
+    }
+
+    /**
+     * Takes one seat of a session loaded in the caller's transaction and writes it immediately.
+     *
+     * <p>The flush runs the version-checked {@code UPDATE} now rather than at commit. Under
+     * optimistic locking a version conflict therefore surfaces here, before the caller inserts its
+     * booking, so no insert is wasted on a transaction that is going to roll back. The trade-off is
+     * that the row lock taken by the {@code UPDATE} is held a little longer, until the commit.
+     *
+     * @param session a session loaded in the current transaction
+     * @throws com.courtservice.common.error.BusinessException with {@code SESSION_FULL} if no seat
+     *                                                         is left
+     * @throws org.springframework.orm.ObjectOptimisticLockingFailureException if another transaction
+     *                                                                         changed the session
+     *                                                                         after it was read
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void bookSeat(CourtSession session) {
+        session.book();
+        courtSessionRepository.flush();
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public CourtSession findSessionForUpdate(Long id) {
+        return courtSessionRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException(RESOURCE_NAME, id));
     }
 }

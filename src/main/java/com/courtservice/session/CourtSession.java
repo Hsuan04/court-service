@@ -1,7 +1,9 @@
 package com.courtservice.session;
 
 import com.courtservice.common.BaseEntity;
+import com.courtservice.common.error.BusinessException;
 import com.courtservice.common.error.BusinessRuleViolationException;
+import com.courtservice.common.error.ErrorCode;
 import com.courtservice.common.error.InvalidTimeRangeException;
 import com.courtservice.court.Court;
 import jakarta.persistence.Column;
@@ -120,6 +122,26 @@ public class CourtSession extends BaseEntity {
         this.capacity = newCapacity;
     }
 
+    /**
+     * Takes one seat of this session for a new booking.
+     * @throws BusinessException with {@link ErrorCode#SESSION_FULL} if no seat is left
+     */
+    public void book() {
+        if (isFull()) {
+            throw new BusinessException(ErrorCode.SESSION_FULL, ErrorCode.SESSION_FULL.getDefaultDetail());
+        }
+        bookedCount++;
+    }
+
+    /**
+     * Returns whether every seat of this session is taken.
+     *
+     * @return {@code true} if {@code bookedCount} has reached {@code capacity}
+     */
+    public boolean isFull() {
+        return bookedCount >= capacity;
+    }
+
     private static void validateTimeRanges(LocalTime startTime, LocalTime endTime,
                                            OffsetDateTime openAt, OffsetDateTime closeAt) {
         if (!endTime.isAfter(startTime)) {
@@ -135,4 +157,5 @@ public class CourtSession extends BaseEntity {
             throw new BusinessRuleViolationException("Capacity must be greater than 0.");
         }
     }
+
 }
