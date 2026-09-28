@@ -19,4 +19,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      * {@code member}.
      */
     Page<Booking> findByMemberId(Long memberId, Pageable pageable);
+
+    boolean existsByCourtSessionIdAndMemberId(Long courtSessionId, Long memberId);
 }

@@ -19,6 +19,9 @@ import lombok.NoArgsConstructor;
 @Entity
 public class Booking extends BaseEntity {
 
+    /** Name of the database constraint that allows a member to book a session only once. */
+    public static final String SESSION_MEMBER_UNIQUE_CONSTRAINT = "uq_booking_session_member";
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "court_session_id", nullable = false)
     private CourtSession courtSession;
