@@ -35,7 +35,11 @@ public enum ErrorCode {
     CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "Concurrent Modification",
             "The resource was modified concurrently. Please retry."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
-            "An unexpected error occurred. Please contact support with the trace ID.");
+            "An unexpected error occurred. Please contact support with the trace ID."),
+    SESSION_FULL(HttpStatus.CONFLICT, "Session Full",
+            "The court session has no remaining capacity."),
+    DUPLICATE_BOOKING(HttpStatus.CONFLICT, "Duplicate Booking",
+            "The member has already booked this court session.");
 
     private static final String PROBLEM_TYPE_BASE_URI = "https://court-service.example/problems/";
 
