@@ -1,5 +1,6 @@
-package com.courtservice;
+package com.courtservice.common.error;
 
+import com.courtservice.TestcontainersConfiguration;
 import errorsupport.TestErrorControllerConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

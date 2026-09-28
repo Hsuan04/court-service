@@ -1,5 +1,6 @@
-package com.courtservice;
+package com.courtservice.common.config;
 
+import com.courtservice.TestcontainersConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

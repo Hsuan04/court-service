@@ -1,5 +1,7 @@
-package com.courtservice;
+package com.courtservice.court;
 
+import com.courtservice.TestcontainersConfiguration;
+import com.courtservice.IntegrationTestData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

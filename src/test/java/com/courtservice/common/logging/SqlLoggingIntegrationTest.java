@@ -1,8 +1,7 @@
-package com.courtservice;
+package com.courtservice.common.logging;
 
+import com.courtservice.TestcontainersConfiguration;
 import ch.qos.logback.classic.Level;
-import com.courtservice.common.logging.CapturedLogEvents;
-import com.courtservice.common.logging.SqlExecutionLogger;
 import net.ttddyy.dsproxy.support.ProxyDataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

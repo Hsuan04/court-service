@@ -1,5 +1,7 @@
-package com.courtservice;
+package com.courtservice.session;
 
+import com.courtservice.TestcontainersConfiguration;
+import com.courtservice.IntegrationTestData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,12 +10,15 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.hasSize;
@@ -39,6 +44,12 @@ class CourtSessionIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private CourtSessionService courtSessionService;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
     private IntegrationTestData data;
 
     private long courtId;
@@ -48,6 +59,38 @@ class CourtSessionIntegrationTest {
         data = new IntegrationTestData(jdbcTemplate);
         data.truncateAll();
         courtId = data.insertCourt("Court A");
+    }
+
+    @Test
+    void bookSeatWritesTheSeatBeforeTheTransactionCommits() {
+        // given
+        long id = data.insertSession(courtId, 10);
+
+        // when
+        Integer bookedCountInsideTransaction = transactionTemplate.execute(status -> {
+            courtSessionService.bookSeat(courtSessionService.findSession(id));
+            // JdbcTemplate shares the transaction's connection, so it sees the flushed UPDATE.
+            return data.bookedCount(id);
+        });
+
+        // then
+        assertThat(bookedCountInsideTransaction).isEqualTo(1);
+        assertThat(data.bookedCount(id)).isEqualTo(1);
+    }
+
+    @Test
+    void bookSeatFailsWhenTheSessionChangedAfterItWasRead() {
+        // given
+        long id = data.insertSession(courtId, 10);
+
+        // when / then
+        assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
+            CourtSession session = courtSessionService.findSession(id);
+            // Stands in for another transaction that committed a change after this read.
+            jdbcTemplate.update("UPDATE court_session SET version = version + 1 WHERE id = ?", id);
+            courtSessionService.bookSeat(session);
+        })).isInstanceOf(ObjectOptimisticLockingFailureException.class);
+        assertThat(data.bookedCount(id)).isZero();
     }
 
     @Test

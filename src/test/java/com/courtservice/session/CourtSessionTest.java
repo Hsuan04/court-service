@@ -191,6 +191,57 @@ class CourtSessionTest {
         assertThat(session.getBookedCount()).isEqualTo(3);
     }
 
+    @Test
+    void bookTakesOneSeat() {
+        // given
+        CourtSession session = sessionWithBookings(3);
+
+        // when
+        session.book();
+
+        // then
+        assertThat(session.getBookedCount()).isEqualTo(4);
+    }
+
+    @Test
+    void bookFillsTheLastSeat() {
+        // given
+        CourtSession session = sessionWithBookings(CAPACITY - 1);
+
+        // when
+        session.book();
+
+        // then
+        assertThat(session.getBookedCount()).isEqualTo(CAPACITY);
+    }
+
+    @Test
+    void bookRejectsFullSessionAndLeavesBookedCountUnchanged() {
+        // given
+        CourtSession session = sessionWithBookings(CAPACITY);
+
+        // when / then
+        assertThatThrownBy(session::book)
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.SESSION_FULL);
+        assertThat(session.getBookedCount()).isEqualTo(CAPACITY);
+    }
+
+    @Test
+    void isFullIsFalseWhileSeatsRemain() {
+        CourtSession session = sessionWithBookings(CAPACITY - 1);
+
+        assertThat(session.isFull()).isFalse();
+    }
+
+    @Test
+    void isFullIsTrueOnceEverySeatIsTaken() {
+        CourtSession session = sessionWithBookings(CAPACITY);
+
+        assertThat(session.isFull()).isTrue();
+    }
+
     private CourtSession newSession() {
         return new CourtSession(new Court("Court A", null), DATE, START, END, CAPACITY, OPEN_AT, CLOSE_AT);
     }

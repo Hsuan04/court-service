@@ -1,10 +1,9 @@
-package com.courtservice;
+package com.courtservice.common.logging;
 
+import com.courtservice.TestcontainersConfiguration;
+import com.courtservice.IntegrationTestData;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import com.courtservice.common.logging.CapturedLogEvents;
-import com.courtservice.common.logging.RequestLoggingAspect;
-import com.courtservice.common.logging.RequestLoggingInterceptor;
 import loggingsupport.TestLoggingControllerConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

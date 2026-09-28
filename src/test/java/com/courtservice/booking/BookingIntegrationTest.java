@@ -1,5 +1,7 @@
-package com.courtservice;
+package com.courtservice.booking;
 
+import com.courtservice.TestcontainersConfiguration;
+import com.courtservice.IntegrationTestData;
 import com.courtservice.member.Member;
 import com.courtservice.session.CourtSession;
 import jakarta.persistence.EntityManagerFactory;
@@ -16,9 +18,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -36,6 +41,8 @@ class BookingIntegrationTest {
 
     /** Session existence check, page data query and page count query. */
     private static final long MAX_STATEMENTS_FOR_BOOKING_PAGE = 3;
+
+    private static final int SESSION_CAPACITY = 10;
 
     @Autowired
     private MockMvc mockMvc;
@@ -58,8 +65,8 @@ class BookingIntegrationTest {
         data = new IntegrationTestData(jdbcTemplate);
         data.truncateAll();
         long courtId = data.insertCourt("Court A");
-        sessionId = data.insertSession(courtId, 10);
-        otherSessionId = data.insertSession(courtId, 10);
+        sessionId = data.insertSession(courtId, SESSION_CAPACITY);
+        otherSessionId = data.insertSession(courtId, SESSION_CAPACITY);
         memberId = data.insertMember("Alice");
         otherMemberId = data.insertMember("Bob");
     }
@@ -168,6 +175,106 @@ class BookingIntegrationTest {
         assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(MAX_STATEMENTS_FOR_BOOKING_PAGE);
         assertThat(loadsAndFetches(statistics, CourtSession.class)).isZero();
         assertThat(loadsAndFetches(statistics, Member.class)).isZero();
+    }
+
+    @Test
+    void createReturnsCreatedWithLocationAndTakesOneSeat() throws Exception {
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingBody(sessionId, memberId)))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", endsWith("/api/bookings/" + firstBookingId())))
+                .andExpect(jsonPath("$.booking.courtSessionId").value(sessionId))
+                .andExpect(jsonPath("$.booking.memberId").value(memberId))
+                .andExpect(jsonPath("$.booking.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.capacity").value(SESSION_CAPACITY))
+                .andExpect(jsonPath("$.bookedCount").value(1));
+
+        assertThat(bookingRows(sessionId)).isEqualTo(1);
+        assertThat(data.bookedCount(sessionId)).isEqualTo(1);
+    }
+
+    @Test
+    void createRejectsMissingIds() throws Exception {
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors", hasSize(2)));
+
+        assertThat(bookingRows(sessionId)).isZero();
+    }
+
+    @Test
+    void createReturnsNotFoundForUnknownSession() throws Exception {
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingBody(IntegrationTestData.MISSING_ID, memberId)))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void createReturnsNotFoundForUnknownMember() throws Exception {
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingBody(sessionId, IntegrationTestData.MISSING_ID)))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+        assertThat(data.bookedCount(sessionId)).isZero();
+    }
+
+    @Test
+    void createRejectsFullSessionWithoutWritingAnything() throws Exception {
+        // given
+        data.setBookedCount(sessionId, SESSION_CAPACITY);
+
+        // when / then
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingBody(sessionId, memberId)))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("SESSION_FULL"));
+
+        assertThat(bookingRows(sessionId)).isZero();
+        assertThat(data.bookedCount(sessionId)).isEqualTo(SESSION_CAPACITY);
+    }
+
+    @Test
+    void createRejectsSecondBookingOfTheSameMember() throws Exception {
+        // given
+        data.insertBooking(sessionId, memberId);
+
+        // when / then
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingBody(sessionId, memberId)))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("DUPLICATE_BOOKING"));
+
+        assertThat(bookingRows(sessionId)).isEqualTo(1);
+    }
+
+    private static String bookingBody(long courtSessionId, long memberId) {
+        return """
+                {"courtSessionId": %d, "memberId": %d}
+                """.formatted(courtSessionId, memberId);
+    }
+
+    private int bookingRows(long courtSessionId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM booking WHERE court_session_id = ?", Integer.class, courtSessionId);
+    }
+
+    private long firstBookingId() {
+        return jdbcTemplate.queryForObject("SELECT min(id) FROM booking", Long.class);
     }
 
     private long loadsAndFetches(Statistics statistics, Class<?> entityType) {
