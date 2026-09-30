@@ -4,12 +4,14 @@ import com.courtservice.IntegrationTestData;
 import com.courtservice.TestcontainersConfiguration;
 import com.courtservice.booking.BookingRepository;
 import com.courtservice.booking.BookingService;
+import com.courtservice.booking.SoldOutSessionCache;
 import com.courtservice.booking.dto.BookingCreateRequest;
 import com.courtservice.booking.strategy.impl.SynchronizedBookingStrategy;
 import com.courtservice.common.error.BusinessException;
 import com.courtservice.common.error.ErrorCode;
 import com.courtservice.member.MemberService;
 import com.courtservice.session.CourtSessionService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -122,12 +124,22 @@ class SynchronizedBookingStrategyIntegrationTest {
 
     /**
      * Builds a {@link BookingService} around the synchronized strategy directly, so the test does
-     * not depend on the mode configured in {@code app.booking.concurrency-mode}.
+     * not depend on the mode configured in {@code app.booking.concurrency-mode}. The sold-out flag
+     * is off, so every request queues on the lock as the table is meant to show.
      */
     private BookingService bookingServiceUsingSynchronizedStrategy() {
+        BookingProperties properties = new BookingProperties(BookingConcurrencyMode.SYNCHRONIZED,
+                bookingProperties.optimisticRetry(), withoutSoldOutFlag());
         BookingStrategyRegistry registry = new BookingStrategyRegistry(List.of(synchronizedBookingStrategy),
-                new BookingProperties(BookingConcurrencyMode.SYNCHRONIZED, bookingProperties.optimisticRetry()));
-        return new BookingService(bookingRepository, courtSessionService, memberService, registry);
+                properties);
+        return new BookingService(bookingRepository, courtSessionService, memberService, registry,
+                new SoldOutSessionCache(properties, new SimpleMeterRegistry()));
+    }
+
+    /** Keeps the sold-out flag off, so the strategy under test sees every request. */
+    private BookingProperties.SoldOutCache withoutSoldOutFlag() {
+        BookingProperties.SoldOutCache configured = bookingProperties.soldOutCache();
+        return new BookingProperties.SoldOutCache(false, configured.ttl(), configured.maximumSize());
     }
 
     /** Releases every request at the same moment, one platform thread each, and records its timing. */

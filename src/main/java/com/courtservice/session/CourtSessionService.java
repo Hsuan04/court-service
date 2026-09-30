@@ -7,6 +7,7 @@ import com.courtservice.session.dto.CourtSessionCreateRequest;
 import com.courtservice.session.dto.CourtSessionResponse;
 import com.courtservice.session.dto.CourtSessionUpdateRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -29,10 +30,13 @@ public class CourtSessionService {
 
     private final CourtSessionRepository courtSessionRepository;
     private final CourtService courtService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public CourtSessionService(CourtSessionRepository courtSessionRepository, CourtService courtService) {
+    public CourtSessionService(CourtSessionRepository courtSessionRepository, CourtService courtService,
+                               ApplicationEventPublisher eventPublisher) {
         this.courtSessionRepository = courtSessionRepository;
         this.courtService = courtService;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -79,6 +83,9 @@ public class CourtSessionService {
      * {@code bookedCount} are left unchanged. If either business method rejects the change,
      * the exception rolls back the whole transaction, so no partial update is persisted.
      *
+     * <p>Publishes a {@link CourtSessionChangedEvent}; listeners that act after commit see the new
+     * capacity.
+     *
      * @param id      the session id
      * @param request the new schedule and capacity
      * @return the updated session
@@ -96,6 +103,7 @@ public class CourtSessionService {
         // Flush before mapping so that @UpdateTimestamp has already refreshed updatedAt.
         courtSessionRepository.flush();
         log.info("Updated court session {}", id);
+        eventPublisher.publishEvent(new CourtSessionChangedEvent(id));
         return toResponse(session);
     }
 
@@ -116,6 +124,8 @@ public class CourtSessionService {
      * {@link org.springframework.dao.DataIntegrityViolationException} is raised here and mapped
      * to {@code RESOURCE_IN_USE} by the global exception handler.
      *
+     * <p>Publishes a {@link CourtSessionChangedEvent} once the delete has succeeded.
+     *
      * @param id the session id
      * @throws ResourceNotFoundException if no session has the given id
      * @throws org.springframework.dao.DataIntegrityViolationException if the session still has bookings
@@ -125,6 +135,7 @@ public class CourtSessionService {
         courtSessionRepository.delete(findSession(id));
         courtSessionRepository.flush();
         log.info("Deleted court session {}", id);
+        eventPublisher.publishEvent(new CourtSessionChangedEvent(id));
     }
 
     /**

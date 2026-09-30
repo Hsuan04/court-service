@@ -41,9 +41,12 @@ class OptimisticLockBookingStrategyTest {
     private static final OffsetDateTime OPEN_AT = OffsetDateTime.of(2026, 9, 25, 0, 0, 0, 0, ZoneOffset.UTC);
     private static final int MAX_ATTEMPTS = 5;
 
+    private static final BookingProperties.SoldOutCache SOLD_OUT_FLAG_OFF =
+            new BookingProperties.SoldOutCache(false, Duration.ZERO, 1);
+
     /** No wait between attempts, so the retry loop runs instantly. */
     private static final BookingProperties PROPERTIES = new BookingProperties(BookingConcurrencyMode.OPTIMISTIC_LOCK,
-            new BookingProperties.OptimisticRetry(MAX_ATTEMPTS, Duration.ZERO, Duration.ZERO));
+            new BookingProperties.OptimisticRetry(MAX_ATTEMPTS, Duration.ZERO, Duration.ZERO), SOLD_OUT_FLAG_OFF);
 
     private CourtSessionService courtSessionService;
     private TransactionTemplate transactionTemplate;

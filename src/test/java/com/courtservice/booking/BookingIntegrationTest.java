@@ -53,6 +53,9 @@ class BookingIntegrationTest {
     @Autowired
     private EntityManagerFactory entityManagerFactory;
 
+    @Autowired
+    private SoldOutSessionCache soldOutSessionCache;
+
     private IntegrationTestData data;
 
     private long sessionId;
@@ -64,6 +67,8 @@ class BookingIntegrationTest {
     void setUp() {
         data = new IntegrationTestData(jdbcTemplate);
         data.truncateAll();
+        // Truncation restarts ids, so a flag left by a previous test would hit this test's sessions.
+        soldOutSessionCache.invalidateAll();
         long courtId = data.insertCourt("Court A");
         sessionId = data.insertSession(courtId, SESSION_CAPACITY);
         otherSessionId = data.insertSession(courtId, SESSION_CAPACITY);

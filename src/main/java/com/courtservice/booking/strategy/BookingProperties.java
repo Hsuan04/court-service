@@ -13,12 +13,31 @@ import java.time.Duration;
  * Booking settings bound from {@code app.booking.*}.
  * @param concurrencyMode which {@link BookingStrategy} is active
  * @param optimisticRetry retry settings of the {@code optimistic-lock} strategy
+ * @param soldOutCache    settings of the in-memory sold-out flag that rejects bookings of a full
+ *                        session before any strategy runs
  */
 @Validated
 @ConfigurationProperties("app.booking")
 public record BookingProperties(
         @NotNull BookingConcurrencyMode concurrencyMode,
-        @Valid @DefaultValue OptimisticRetry optimisticRetry) {
+        @Valid @DefaultValue OptimisticRetry optimisticRetry,
+        @Valid @DefaultValue SoldOutCache soldOutCache) {
+
+    /**
+     * The per-instance sold-out flag, bound from {@code app.booking.sold-out-cache.*}. Disabled by
+     * default so that each strategy can be observed on its own.
+     *
+     * @param enabled     whether full sessions are remembered and later bookings rejected early
+     * @param ttl         how long a flag lives; a longer TTL rejects more requests early but may
+     *                    wrongly reject a booking after a seat was freed elsewhere
+     * @param maximumSize the most sessions flagged at once; beyond it Caffeine drops flags, which
+     *                    only costs those sessions a trip to the database
+     */
+    public record SoldOutCache(
+            @DefaultValue("false") boolean enabled,
+            @NotNull @DefaultValue("5s") Duration ttl,
+            @Min(1) @DefaultValue("10000") long maximumSize) {
+    }
 
     /**
      * How the optimistic-lock strategy retries after a version conflict, bound from

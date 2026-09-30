@@ -38,13 +38,16 @@ public class BookingService {
     private final CourtSessionService courtSessionService;
     private final MemberService memberService;
     private final BookingStrategyRegistry bookingStrategyRegistry;
+    private final SoldOutSessionCache soldOutSessionCache;
 
     public BookingService(BookingRepository bookingRepository, CourtSessionService courtSessionService,
-                          MemberService memberService, BookingStrategyRegistry bookingStrategyRegistry) {
+                          MemberService memberService, BookingStrategyRegistry bookingStrategyRegistry,
+                          SoldOutSessionCache soldOutSessionCache) {
         this.bookingRepository = bookingRepository;
         this.courtSessionService = courtSessionService;
         this.memberService = memberService;
         this.bookingStrategyRegistry = bookingStrategyRegistry;
+        this.soldOutSessionCache = soldOutSessionCache;
     }
 
     /**
@@ -101,17 +104,32 @@ public class BookingService {
      * insert. That violation is translated here, once for every strategy, into the same
      * {@code DUPLICATE_BOOKING} error the check would have raised.
      *
+     * <p>Before any strategy runs, a session flagged as sold out by {@link SoldOutSessionCache} is
+     * rejected with {@code SESSION_FULL} without touching the database. This changes the error
+     * precedence while the flag lives: an unknown member gets {@code SESSION_FULL} rather than
+     * {@code RESOURCE_NOT_FOUND}, and a repeated booking gets {@code SESSION_FULL} rather than
+     * {@code DUPLICATE_BOOKING}. That is accepted because skipping the database is the purpose of
+     * the flag, neither request could succeed, and the precise error returns once the flag expires.
+     * The flag is set when a strategy reports {@code SESSION_FULL} or a booking takes the last seat.
+     *
      * @param request the session and member to book
      * @return the created booking with the capacity and booked count the strategy wrote
      * @throws ResourceNotFoundException if the session or member does not exist
      * @throws BusinessException with {@code DUPLICATE_BOOKING} if the member already booked the
-     *                           session
+     *                           session, or {@code SESSION_FULL} if no seat is left or the session
+     *                           is flagged as sold out
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public BookingCreateResponse create(BookingCreateRequest request) {
+        soldOutSessionCache.rejectIfSoldOut(request.courtSessionId());
         BookingOutcome outcome;
         try {
             outcome = bookingStrategyRegistry.active().book(request.courtSessionId(), request.memberId());
+        } catch (BusinessException e) {
+            if (e.getErrorCode() == ErrorCode.SESSION_FULL) {
+                soldOutSessionCache.markSoldOut(request.courtSessionId());
+            }
+            throw e;
         } catch (DataIntegrityViolationException e) {
             if (!violatesSessionMemberUniqueness(e)) {
                 throw e;
@@ -119,6 +137,9 @@ public class BookingService {
             log.info("Session {} member {}: duplicate booking rejected by the unique constraint",
                     request.courtSessionId(), request.memberId());
             throw new BusinessException(ErrorCode.DUPLICATE_BOOKING, ErrorCode.DUPLICATE_BOOKING.getDefaultDetail());
+        }
+        if (outcome.bookedCount() >= outcome.capacity()) {
+            soldOutSessionCache.markSoldOut(request.courtSessionId());
         }
         BookingResponse booking = toResponse(outcome.booking());
         log.info("Created booking {} for session {} by member {} (bookedCount={}/{})", booking.id(),

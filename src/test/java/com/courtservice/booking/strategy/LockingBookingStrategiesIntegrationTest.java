@@ -4,11 +4,13 @@ import com.courtservice.IntegrationTestData;
 import com.courtservice.TestcontainersConfiguration;
 import com.courtservice.booking.BookingRepository;
 import com.courtservice.booking.BookingService;
+import com.courtservice.booking.SoldOutSessionCache;
 import com.courtservice.booking.dto.BookingCreateRequest;
 import com.courtservice.common.error.BusinessException;
 import com.courtservice.common.error.ErrorCode;
 import com.courtservice.member.MemberService;
 import com.courtservice.session.CourtSessionService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -157,9 +159,17 @@ class LockingBookingStrategiesIntegrationTest {
                 .filter(candidate -> candidate.mode() == mode)
                 .findFirst()
                 .orElseThrow();
-        BookingStrategyRegistry registry = new BookingStrategyRegistry(List.of(strategy),
-                new BookingProperties(mode, bookingProperties.optimisticRetry()));
-        return new BookingService(bookingRepository, courtSessionService, memberService, registry);
+        BookingProperties properties = new BookingProperties(mode, bookingProperties.optimisticRetry(),
+                withoutSoldOutFlag());
+        BookingStrategyRegistry registry = new BookingStrategyRegistry(List.of(strategy), properties);
+        return new BookingService(bookingRepository, courtSessionService, memberService, registry,
+                new SoldOutSessionCache(properties, new SimpleMeterRegistry()));
+    }
+
+    /** Keeps the sold-out flag off, so the strategy under test sees every request. */
+    private BookingProperties.SoldOutCache withoutSoldOutFlag() {
+        BookingProperties.SoldOutCache configured = bookingProperties.soldOutCache();
+        return new BookingProperties.SoldOutCache(false, configured.ttl(), configured.maximumSize());
     }
 
     /**

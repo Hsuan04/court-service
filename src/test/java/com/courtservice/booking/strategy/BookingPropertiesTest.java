@@ -48,6 +48,39 @@ class BookingPropertiesTest {
     }
 
     @Test
+    void soldOutCacheDefaultsToDisabledWithFiveSecondTtl() {
+        // given
+        Binder binder = new Binder(new MapConfigurationPropertySource(
+                Map.of(PREFIX + ".concurrency-mode", "synchronized")));
+
+        // when
+        BookingProperties properties = binder.bind(PREFIX, BookingProperties.class).get();
+
+        // then
+        assertThat(properties.soldOutCache().enabled()).isFalse();
+        assertThat(properties.soldOutCache().ttl()).isEqualTo(Duration.ofSeconds(5));
+        assertThat(properties.soldOutCache().maximumSize()).isEqualTo(10_000);
+    }
+
+    @Test
+    void soldOutCacheBindsConfiguredValues() {
+        // given
+        Binder binder = new Binder(new MapConfigurationPropertySource(Map.of(
+                PREFIX + ".concurrency-mode", "synchronized",
+                PREFIX + ".sold-out-cache.enabled", "true",
+                PREFIX + ".sold-out-cache.ttl", "3s",
+                PREFIX + ".sold-out-cache.maximum-size", "500")));
+
+        // when
+        BookingProperties properties = binder.bind(PREFIX, BookingProperties.class).get();
+
+        // then
+        assertThat(properties.soldOutCache().enabled()).isTrue();
+        assertThat(properties.soldOutCache().ttl()).isEqualTo(Duration.ofSeconds(3));
+        assertThat(properties.soldOutCache().maximumSize()).isEqualTo(500);
+    }
+
+    @Test
     void optimisticRetryRejectsMaxBackoffShorterThanMinBackoff() {
         assertThatThrownBy(() -> new BookingProperties.OptimisticRetry(5, Duration.ofSeconds(5), Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class);
