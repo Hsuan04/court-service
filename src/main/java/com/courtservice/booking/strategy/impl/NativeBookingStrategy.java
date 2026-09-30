@@ -17,19 +17,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
-public class NaiveBookingStrategy implements BookingStrategy {
+public class NativeBookingStrategy implements BookingStrategy {
 
-    private static final Logger log = LoggerFactory.getLogger(NaiveBookingStrategy.class);
+    private static final Logger log = LoggerFactory.getLogger(NativeBookingStrategy.class);
 
     private final CourtSessionService courtSessionService;
     private final MemberService memberService;
     private final BookingRepository bookingRepository;
     private final TransactionTemplate transactionTemplate;
 
-    public NaiveBookingStrategy(CourtSessionService courtSessionService,
-                                MemberService memberService,
-                                BookingRepository bookingRepository,
-                                TransactionTemplate transactionTemplate) {
+    public NativeBookingStrategy(CourtSessionService courtSessionService,
+                                 MemberService memberService,
+                                 BookingRepository bookingRepository,
+                                 TransactionTemplate transactionTemplate) {
         this.courtSessionService = courtSessionService;
         this.memberService = memberService;
         this.bookingRepository = bookingRepository;

@@ -30,7 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Proves in the default build, and therefore in CI, that the database-locking strategies never
+ * Proves in the default build, and therefore in CI, that the locking strategies (JVM-wide
+ * {@code synchronized}, database row lock and atomic update) never
  * oversell, never book a member twice and never leave {@code booked_count} out of step with the
  * booking rows. Their outcome does not depend on thread timing, so every number is asserted exactly.
  *
@@ -79,7 +80,7 @@ class LockingBookingStrategiesIntegrationTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = BookingConcurrencyMode.class, names = {"PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
+    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
     void exactlyCapacityMembersWinARaceForOneSession(BookingConcurrencyMode mode) throws InterruptedException {
         // given
         List<Long> memberIds = IntStream.range(0, MEMBERS)
@@ -103,7 +104,7 @@ class LockingBookingStrategiesIntegrationTest {
      * rejects its insert, so {@code booked_count = 1} proves that those seats were rolled back.
      */
     @ParameterizedTest
-    @EnumSource(value = BookingConcurrencyMode.class, names = {"PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
+    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
     void sameMemberRacingWithItselfBooksOnlyOnce(BookingConcurrencyMode mode) throws InterruptedException {
         // given
         List<Long> sameMemberTwentyTimes = Collections.nCopies(SAME_MEMBER_REQUESTS, data.insertMember("Alice"));
@@ -120,7 +121,7 @@ class LockingBookingStrategiesIntegrationTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = BookingConcurrencyMode.class, names = {"PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
+    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
     void bookingAnUnknownSessionIsRejectedAsNotFound(BookingConcurrencyMode mode) {
         // given
         long memberId = data.insertMember("Alice");
@@ -135,7 +136,7 @@ class LockingBookingStrategiesIntegrationTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = BookingConcurrencyMode.class, names = {"PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
+    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
     void bookingAFullSessionIsRejectedWithoutWritingAnything(BookingConcurrencyMode mode) {
         // given
         data.setBookedCount(sessionId, CAPACITY);
