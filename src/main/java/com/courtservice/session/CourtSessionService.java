@@ -13,6 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
+import java.util.Optional;
+
 /**
  * Manages court sessions. {@code bookedCount} is never changed here; it belongs to the booking
  * flow. Depends on the court module through {@link CourtService} only.
@@ -159,22 +162,37 @@ public class CourtSessionService {
     /**
      * Takes one seat of a session loaded in the caller's transaction and writes it immediately.
      *
-     * <p>The flush runs the version-checked {@code UPDATE} now rather than at commit. Under
-     * optimistic locking a version conflict therefore surfaces here, before the caller inserts its
-     * booking, so no insert is wasted on a transaction that is going to roll back. The trade-off is
-     * that the row lock taken by the {@code UPDATE} is held a little longer, until the commit.
-     *
      * @param session a session loaded in the current transaction
-     * @throws com.courtservice.common.error.BusinessException with {@code SESSION_FULL} if no seat
-     *                                                         is left
-     * @throws org.springframework.orm.ObjectOptimisticLockingFailureException if another transaction
-     *                                                                         changed the session
-     *                                                                         after it was read
+     * @throws com.courtservice.common.error.BusinessException with {@code SESSION_FULL} if no seat is left
+     * @throws org.springframework.orm.ObjectOptimisticLockingFailureException if another transaction changed the session after it was read
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void bookSeat(CourtSession session) {
         session.book();
         courtSessionRepository.flush();
+    }
+
+    /**
+     * Takes one seat of a session with a single conditional {@code UPDATE}, for the atomic-update
+     * booking strategy.
+     * @param id the session id
+     * @return the counters after the increment, or empty if the session is full or does not exist
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<BookedCountSnapshot> incrementBookedCountIfAvailable(Long id) {
+        return courtSessionRepository.incrementBookedCountIfAvailable(id, OffsetDateTime.now());
+    }
+
+    /**
+     * Returns a reference to a session, for callers that only need it to set a foreign key. No
+     * query is issued and existence is not checked, so it is meant for callers that already know
+     * the session exists, for example after {@link #incrementBookedCountIfAvailable(Long)} matched it.
+     *
+     * @param id the session id
+     * @return a lazy reference to the session
+     */
+    public CourtSession getSessionReference(Long id) {
+        return courtSessionRepository.getReferenceById(id);
     }
 
     @Transactional(propagation = Propagation.MANDATORY)

@@ -12,10 +12,13 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -50,6 +53,9 @@ class CourtSessionIntegrationTest {
     @Autowired
     private TransactionTemplate transactionTemplate;
 
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     private IntegrationTestData data;
 
     private long courtId;
@@ -75,6 +81,70 @@ class CourtSessionIntegrationTest {
 
         // then
         assertThat(bookedCountInsideTransaction).isEqualTo(1);
+        assertThat(data.bookedCount(id)).isEqualTo(1);
+    }
+
+    @Test
+    void incrementBookedCountIfAvailableTakesASeatAndBumpsTheVersion() {
+        // given
+        long id = data.insertSession(courtId, 10);
+        data.setBookedCount(id, 3);
+
+        // when
+        Optional<BookedCountSnapshot> snapshot = transactionTemplate.execute(
+                status -> courtSessionService.incrementBookedCountIfAvailable(id));
+
+        // then
+        assertThat(snapshot).hasValueSatisfying(counters -> {
+            assertThat(counters.getBookedCount()).isEqualTo(4);
+            assertThat(counters.getCapacity()).isEqualTo(10);
+        });
+        assertThat(data.bookedCount(id)).isEqualTo(4);
+        assertThat(version(id)).isEqualTo(1);
+    }
+
+    @Test
+    void incrementBookedCountIfAvailableLeavesAFullSessionUntouched() {
+        // given
+        long id = data.insertSession(courtId, 10);
+        data.setBookedCount(id, 10);
+
+        // when
+        Optional<BookedCountSnapshot> snapshot = transactionTemplate.execute(
+                status -> courtSessionService.incrementBookedCountIfAvailable(id));
+
+        // then
+        assertThat(snapshot).isEmpty();
+        assertThat(data.bookedCount(id)).isEqualTo(10);
+        assertThat(version(id)).isZero();
+    }
+
+    @Test
+    void incrementBookedCountIfAvailableReturnsEmptyForUnknownSession() {
+        Optional<BookedCountSnapshot> snapshot = transactionTemplate.execute(
+                status -> courtSessionService.incrementBookedCountIfAvailable(IntegrationTestData.MISSING_ID));
+
+        assertThat(snapshot).isEmpty();
+    }
+
+    /**
+     * Guards the version bump of the atomic update: without it, a copy of the session read before
+     * the update would be saved back with its stale booked_count and silently lose the booking.
+     */
+    @Test
+    void atomicIncrementMakesAStaleCopyFailInsteadOfOverwritingBookedCount() {
+        // given
+        long id = data.insertSession(courtId, 10);
+        TransactionTemplate otherTransaction = new TransactionTemplate(transactionManager);
+        otherTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        // when / then
+        assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
+            CourtSession stale = courtSessionService.findSession(id);
+            otherTransaction.executeWithoutResult(
+                    inner -> courtSessionService.incrementBookedCountIfAvailable(id));
+            stale.changeCapacity(20);
+        })).isInstanceOf(ObjectOptimisticLockingFailureException.class);
         assertThat(data.bookedCount(id)).isEqualTo(1);
     }
 
@@ -351,6 +421,10 @@ class CourtSessionIntegrationTest {
                 .andExpect(jsonPath("$.code").value("RESOURCE_IN_USE"));
 
         assertThat(data.countRows("court_session", id)).isEqualTo(1);
+    }
+
+    private long version(long sessionId) {
+        return jdbcTemplate.queryForObject("SELECT version FROM court_session WHERE id = ?", Long.class, sessionId);
     }
 
     private String createBody(long courtId, String startTime, String endTime, int capacity,

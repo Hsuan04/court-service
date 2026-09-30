@@ -10,6 +10,7 @@ import com.courtservice.member.MemberService;
 import com.courtservice.member.dto.MemberCreateRequest;
 import com.courtservice.session.CourtSessionService;
 import com.courtservice.session.dto.CourtSessionCreateRequest;
+import com.zaxxer.hikari.HikariDataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
+import javax.sql.DataSource;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -32,6 +35,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
@@ -50,7 +55,8 @@ class BookingConcurrencySimulationIntegrationTest {
     static final String SIMULATION_TAG = "simulation";
 
     private static final int CAPACITY = 10;
-    private static final int MEMBERS = 20;
+    private static final int MEMBERS = 500;
+    private static final long POOL_SAMPLE_INTERVAL_MS = 5;
     private static final String SUCCESS = "SUCCESS";
     private static final int MAX_REPORTED_EXCEPTIONS = 5;
     private static final Set<ErrorCode> EXPECTED_REJECTIONS = EnumSet.of(
@@ -75,10 +81,13 @@ class BookingConcurrencySimulationIntegrationTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private DataSource dataSource;
+
     private final String runId = UUID.randomUUID().toString().substring(0, 8);
 
     @Test
-    void membersRacingForOneSessionNeverExceedCapacity() throws InterruptedException {
+    void membersRacingForOneSessionNeverExceedCapacity() throws InterruptedException, SQLException {
         // given
         BookingConcurrencyMode mode = bookingStrategyRegistry.active().mode();
         Long sessionId = createCourtAndSession(mode);
@@ -89,9 +98,18 @@ class BookingConcurrencySimulationIntegrationTest {
         Map<String, AtomicInteger> outcomes = new ConcurrentHashMap<>();
         List<Throwable> unexpected = new CopyOnWriteArrayList<>();
 
+        // Samples how many threads wait for a pooled connection, to show how much of the elapsed
+        // time is spent queueing for the pool rather than in the database.
+        HikariDataSource hikari = dataSource.unwrap(HikariDataSource.class);
+        AtomicInteger peakAwaitingConnection = new AtomicInteger();
+
         // when: every thread waits at the start gate so that all bookings hit the session together
         long startedAt;
-        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+        try (ScheduledExecutorService sampler = Executors.newSingleThreadScheduledExecutor();
+             ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            sampler.scheduleAtFixedRate(() -> peakAwaitingConnection.accumulateAndGet(
+                            hikari.getHikariPoolMXBean().getThreadsAwaitingConnection(), Math::max),
+                    0, POOL_SAMPLE_INTERVAL_MS, TimeUnit.MILLISECONDS);
             for (Long memberId : memberIds) {
                 pool.submit(() -> {
                     ready.countDown();
@@ -105,6 +123,8 @@ class BookingConcurrencySimulationIntegrationTest {
             start.countDown();
         }
         long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
+        log.info("Connection pool size: {}   Peak threads awaiting a connection: {}",
+                hikari.getMaximumPoolSize(), peakAwaitingConnection.get());
 
         // then
         int actualBookings = jdbc.queryForObject(
