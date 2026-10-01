@@ -1,6 +1,5 @@
-package com.courtservice.booking;
+package com.courtservice.booking.cache;
 
-import com.courtservice.booking.cache.SoldOutSessionCache;
 import com.courtservice.booking.strategy.BookingConcurrencyMode;
 import com.courtservice.booking.config.BookingProperties;
 import com.courtservice.common.error.BusinessException;
@@ -160,7 +159,8 @@ class SoldOutSessionCacheTest {
     private SoldOutSessionCache cache(boolean enabled) {
         BookingProperties properties = new BookingProperties(MODE,
                 new BookingProperties.OptimisticRetry(1, Duration.ZERO, Duration.ZERO),
-                new BookingProperties.SoldOutCache(enabled, TTL, MAXIMUM_SIZE));
+                new BookingProperties.SoldOutCache(enabled, TTL, MAXIMUM_SIZE),
+                new BookingProperties.DistributedLock(Duration.ZERO, Duration.ZERO));
         return new SoldOutSessionCache(properties, meterRegistry, nanos::get);
     }
 

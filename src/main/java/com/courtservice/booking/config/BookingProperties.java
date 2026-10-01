@@ -17,13 +17,34 @@ import java.time.Duration;
  * @param optimisticRetry retry settings of the {@code optimistic-lock} strategy
  * @param soldOutCache    settings of the in-memory sold-out flag that rejects bookings of a full
  *                        session before any strategy runs
+ * @param distributedLock settings of the {@code distributed-lock} strategy
  */
 @Validated
 @ConfigurationProperties("app.booking")
 public record BookingProperties(
         @NotNull BookingConcurrencyMode concurrencyMode,
         @Valid @DefaultValue OptimisticRetry optimisticRetry,
-        @Valid @DefaultValue SoldOutCache soldOutCache) {
+        @Valid @DefaultValue SoldOutCache soldOutCache,
+        @Valid @DefaultValue DistributedLock distributedLock) {
+
+    /**
+     * Settings of the distributed-lock strategy, bound from {@code app.booking.distributed-lock.*}.
+     *
+     * <p>There is deliberately no lease time: without one, Redisson's watchdog keeps renewing the
+     * lock while its holder is alive. A fixed lease would let the lock expire under a booking that
+     * runs longer than expected, and a second holder could then enter.
+     *
+     * @param waitTime  longest wait for a session's lock before the booking fails with
+     *                  {@code LOCK_TIMEOUT}
+     * @param debugHold how long to keep the lock after acquiring it and before the transaction
+     *                  starts, so the lock can be inspected by hand. For local observation only:
+     *                  never set it in production, where it would make every booking of a session
+     *                  queue for this long. {@code 0} disables it
+     */
+    public record DistributedLock(
+            @NotNull @DefaultValue("3s") Duration waitTime,
+            @NotNull @DefaultValue("0s") Duration debugHold) {
+    }
 
     /**
      * The per-instance sold-out flag, bound from {@code app.booking.sold-out-cache.*}. Disabled by

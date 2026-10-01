@@ -1,0 +1,9 @@
+# Test-only overrides of the local profile, which every test runs with. Spring Boot loads this file
+# in addition to src/main/resources/application-local.yaml and lets it win, so only the keys below
+# change. Do not move it to src/test/resources/application-local.yaml: that would hide the main file.
+app:
+  booking:
+    distributed-lock:
+      # The local profile keeps every lock for 10s for manual observation; tests must not wait.
+      # Tests that need a hold set it through @SpringBootTest properties.
+      debug-hold: 0s

@@ -2,6 +2,7 @@ package com.courtservice.booking;
 
 import com.courtservice.TestcontainersConfiguration;
 import com.courtservice.IntegrationTestData;
+import com.courtservice.RedisTestData;
 import com.courtservice.booking.cache.SoldOutSessionCache;
 import com.courtservice.member.Member;
 import com.courtservice.session.CourtSession;
@@ -10,6 +11,7 @@ import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -57,6 +59,9 @@ class BookingIntegrationTest {
     @Autowired
     private SoldOutSessionCache soldOutSessionCache;
 
+    @Autowired
+    private RedissonClient redissonClient;
+
     private IntegrationTestData data;
 
     private long sessionId;
@@ -70,6 +75,7 @@ class BookingIntegrationTest {
         data.truncateAll();
         // Truncation restarts ids, so a flag left by a previous test would hit this test's sessions.
         soldOutSessionCache.invalidateAll();
+        new RedisTestData(redissonClient).flushAll();
         long courtId = data.insertCourt("Court A");
         sessionId = data.insertSession(courtId, SESSION_CAPACITY);
         otherSessionId = data.insertSession(courtId, SESSION_CAPACITY);

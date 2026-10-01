@@ -130,7 +130,7 @@ class SynchronizedBookingStrategyIntegrationTest {
      */
     private BookingService bookingServiceUsingSynchronizedStrategy() {
         BookingProperties properties = new BookingProperties(BookingConcurrencyMode.SYNCHRONIZED,
-                bookingProperties.optimisticRetry(), withoutSoldOutFlag());
+                bookingProperties.optimisticRetry(), withoutSoldOutFlag(), bookingProperties.distributedLock());
         BookingStrategyRegistry registry = new BookingStrategyRegistry(List.of(synchronizedBookingStrategy),
                 properties);
         return new BookingService(bookingRepository, courtSessionService, memberService, registry,

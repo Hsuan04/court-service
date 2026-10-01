@@ -57,8 +57,9 @@ public class BookingController {
             @ApiResponse(responseCode = "404", description = "No session or member has the given id.",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(ref = PROBLEM_DETAIL_REF))),
-            @ApiResponse(responseCode = "409", description = "The session is full (SESSION_FULL), or the member "
-                    + "has already booked it (DUPLICATE_BOOKING).",
+            @ApiResponse(responseCode = "409", description = "The session is full (SESSION_FULL), the member "
+                    + "has already booked it (DUPLICATE_BOOKING), or too many bookings of the session are in "
+                    + "progress and the request may be retried (LOCK_TIMEOUT).",
                     content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(ref = PROBLEM_DETAIL_REF))),
             @ApiResponse(responseCode = "500", description = "An unexpected server error occurred.",

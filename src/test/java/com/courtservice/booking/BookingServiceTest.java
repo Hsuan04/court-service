@@ -43,7 +43,8 @@ class BookingServiceTest {
     private static final BookingCreateRequest REQUEST = new BookingCreateRequest(SESSION_ID, MEMBER_ID);
     private static final BookingProperties PROPERTIES = new BookingProperties(BookingConcurrencyMode.SYNCHRONIZED,
             new BookingProperties.OptimisticRetry(1, Duration.ZERO, Duration.ZERO),
-            new BookingProperties.SoldOutCache(true, Duration.ofMinutes(1), 100));
+            new BookingProperties.SoldOutCache(true, Duration.ofMinutes(1), 100),
+            new BookingProperties.DistributedLock(Duration.ZERO, Duration.ZERO));
 
     private BookingStrategy strategy;
     private SoldOutSessionCache soldOutSessionCache;

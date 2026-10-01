@@ -12,6 +12,7 @@ public enum BookingConcurrencyMode {
     PESSIMISTIC_LOCK("SELECT ... FOR UPDATE on the session row"),
     OPTIMISTIC_LOCK("@Version check on update, retried in a new transaction"),
     ATOMIC_UPDATE("Single conditional UPDATE: booked_count < capacity"),
+    DISTRIBUTED_LOCK("Redisson lock per session in Redis; shared by every instance"),
     REDIS_CACHE("Redis DECR pre-deducts seats before writing to the database"),
     REDIS_LUA("Lua script atomically checks and deducts in Redis");
 

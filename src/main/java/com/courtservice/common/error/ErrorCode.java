@@ -39,7 +39,9 @@ public enum ErrorCode {
     SESSION_FULL(HttpStatus.CONFLICT, "Session Full",
             "The court session has no remaining capacity."),
     DUPLICATE_BOOKING(HttpStatus.CONFLICT, "Duplicate Booking",
-            "The member has already booked this court session.");
+            "The member has already booked this court session."),
+    LOCK_TIMEOUT(HttpStatus.CONFLICT, "Lock Timeout",
+            "Too many bookings for this court session at once. Please retry.");
 
     private static final String PROBLEM_TYPE_BASE_URI = "https://court-service.example/problems/";
 

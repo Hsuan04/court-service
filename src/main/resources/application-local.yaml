@@ -4,7 +4,7 @@ app:
       log-all-queries: true
       log-parameters: true
   booking:
-    concurrency-mode: synchronized
+    concurrency-mode: distributed-lock
       #   Booking concurrency strategy
       #   naive            - read-check-write, no protection (intentionally oversells)
       #   synchronized     - one JVM-wide lock; all bookings queue on the same lock
@@ -12,6 +12,7 @@ app:
       #   pessimistic-lock - SELECT ... FOR UPDATE on the session row
       #   optimistic-lock  - @Version check, retried in a new transaction
       #   atomic-update    - single conditional UPDATE (booked_count < capacity)
+      #   distributed-lock - Redisson lock per session in Redis, shared by every instance
       #   redis-cache      - Redis DECR pre-deducts seats, then writes to DB
       #   redis-lua        - Lua script atomically checks and deducts in Redis
     optimistic-retry:  # Used only by optimistic-lock: after a version conflict, wait a random time in
@@ -22,6 +23,18 @@ app:
       enabled: true
       ttl: 5s  # How long a sold-out flag lives; longer rejects more requests early but may wrongly reject after a seat is freed
       maximum-size: 10000
+    distributed-lock:
+      wait-time: 3s      # Longest wait for a session's lock before LOCK_TIMEOUT
+      # Observation only: keep every lock for 10s so it can be inspected in RedisInsight or
+      # /actuator/bookinglocks. A second booking of the same session meanwhile gets LOCK_TIMEOUT
+      # after wait-time. Never set this outside local; tests reset it to 0s.
+      debug-hold: 10s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,bookinglocks   # bookinglocks is exposed in local only
 
 logging:
   structured:

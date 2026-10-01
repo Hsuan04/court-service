@@ -40,6 +40,8 @@ logging:
       max-history: 30
 
 app:
+  redis:
+    address: ${REDIS_URL:redis://localhost:6379}
   logging:
     request:
       enabled: true

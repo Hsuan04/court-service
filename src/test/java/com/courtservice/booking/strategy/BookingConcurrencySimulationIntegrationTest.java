@@ -81,7 +81,7 @@ class BookingConcurrencySimulationIntegrationTest {
     private static final int MAX_REPORTED_EXCEPTIONS = 5;
     private static final Set<ErrorCode> EXPECTED_REJECTIONS = EnumSet.of(
             ErrorCode.SESSION_FULL, ErrorCode.DUPLICATE_BOOKING,
-            ErrorCode.CONCURRENT_MODIFICATION);
+            ErrorCode.CONCURRENT_MODIFICATION, ErrorCode.LOCK_TIMEOUT);
 
     @Autowired
     private BookingService bookingService;

@@ -1,6 +1,7 @@
 package com.courtservice.booking.strategy;
 
 import com.courtservice.IntegrationTestData;
+import com.courtservice.RedisTestData;
 import com.courtservice.TestcontainersConfiguration;
 import com.courtservice.booking.config.BookingProperties;
 import com.courtservice.booking.repository.BookingRepository;
@@ -13,6 +14,7 @@ import com.courtservice.member.MemberService;
 import com.courtservice.session.CourtSessionService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
+import org.redisson.api.RedissonClient;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Proves in the default build, and therefore in CI, that the locking strategies (JVM-wide
- * {@code synchronized}, database row lock and atomic update) never
+ * {@code synchronized}, Redis distributed lock, database row lock and atomic update) never
  * oversell, never book a member twice and never leave {@code booked_count} out of step with the
  * booking rows. Their outcome does not depend on thread timing, so every number is asserted exactly.
  *
@@ -72,6 +74,9 @@ class LockingBookingStrategiesIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private RedissonClient redissonClient;
+
     private IntegrationTestData data;
     private long sessionId;
 
@@ -79,11 +84,12 @@ class LockingBookingStrategiesIntegrationTest {
     void setUp() {
         data = new IntegrationTestData(jdbcTemplate);
         data.truncateAll();
+        new RedisTestData(redissonClient).flushAll();
         sessionId = data.insertSession(data.insertCourt("Court A"), CAPACITY);
     }
 
     @ParameterizedTest
-    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
+    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "DISTRIBUTED_LOCK", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
     void exactlyCapacityMembersWinARaceForOneSession(BookingConcurrencyMode mode) throws InterruptedException {
         // given
         List<Long> memberIds = IntStream.range(0, MEMBERS)
@@ -107,7 +113,7 @@ class LockingBookingStrategiesIntegrationTest {
      * rejects its insert, so {@code booked_count = 1} proves that those seats were rolled back.
      */
     @ParameterizedTest
-    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
+    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "DISTRIBUTED_LOCK", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
     void sameMemberRacingWithItselfBooksOnlyOnce(BookingConcurrencyMode mode) throws InterruptedException {
         // given
         List<Long> sameMemberTwentyTimes = Collections.nCopies(SAME_MEMBER_REQUESTS, data.insertMember("Alice"));
@@ -124,7 +130,7 @@ class LockingBookingStrategiesIntegrationTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
+    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "DISTRIBUTED_LOCK", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
     void bookingAnUnknownSessionIsRejectedAsNotFound(BookingConcurrencyMode mode) {
         // given
         long memberId = data.insertMember("Alice");
@@ -139,7 +145,7 @@ class LockingBookingStrategiesIntegrationTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
+    @EnumSource(value = BookingConcurrencyMode.class, names = {"SYNCHRONIZED", "DISTRIBUTED_LOCK", "PESSIMISTIC_LOCK", "ATOMIC_UPDATE"})
     void bookingAFullSessionIsRejectedWithoutWritingAnything(BookingConcurrencyMode mode) {
         // given
         data.setBookedCount(sessionId, CAPACITY);
@@ -161,7 +167,7 @@ class LockingBookingStrategiesIntegrationTest {
                 .findFirst()
                 .orElseThrow();
         BookingProperties properties = new BookingProperties(mode, bookingProperties.optimisticRetry(),
-                withoutSoldOutFlag());
+                withoutSoldOutFlag(), bookingProperties.distributedLock());
         BookingStrategyRegistry registry = new BookingStrategyRegistry(List.of(strategy), properties);
         return new BookingService(bookingRepository, courtSessionService, memberService, registry,
                 new SoldOutSessionCache(properties, new SimpleMeterRegistry()));

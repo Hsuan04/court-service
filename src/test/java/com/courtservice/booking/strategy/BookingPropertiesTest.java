@@ -82,6 +82,37 @@ class BookingPropertiesTest {
     }
 
     @Test
+    void distributedLockDefaultsToThreeSecondWaitAndNoDebugHold() {
+        // given
+        Binder binder = new Binder(new MapConfigurationPropertySource(
+                Map.of(PREFIX + ".concurrency-mode", "distributed-lock")));
+
+        // when
+        BookingProperties properties = binder.bind(PREFIX, BookingProperties.class).get();
+
+        // then
+        assertThat(properties.concurrencyMode()).isEqualTo(BookingConcurrencyMode.DISTRIBUTED_LOCK);
+        assertThat(properties.distributedLock().waitTime()).isEqualTo(Duration.ofSeconds(3));
+        assertThat(properties.distributedLock().debugHold()).isZero();
+    }
+
+    @Test
+    void distributedLockBindsConfiguredValues() {
+        // given
+        Binder binder = new Binder(new MapConfigurationPropertySource(Map.of(
+                PREFIX + ".concurrency-mode", "distributed-lock",
+                PREFIX + ".distributed-lock.wait-time", "500ms",
+                PREFIX + ".distributed-lock.debug-hold", "10s")));
+
+        // when
+        BookingProperties properties = binder.bind(PREFIX, BookingProperties.class).get();
+
+        // then
+        assertThat(properties.distributedLock().waitTime()).isEqualTo(Duration.ofMillis(500));
+        assertThat(properties.distributedLock().debugHold()).isEqualTo(Duration.ofSeconds(10));
+    }
+
+    @Test
     void optimisticRetryRejectsMaxBackoffShorterThanMinBackoff() {
         assertThatThrownBy(() -> new BookingProperties.OptimisticRetry(5, Duration.ofSeconds(5), Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class);
