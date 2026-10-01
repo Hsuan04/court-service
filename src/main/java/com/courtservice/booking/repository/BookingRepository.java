@@ -1,5 +1,6 @@
-package com.courtservice.booking;
+package com.courtservice.booking.repository;
 
+import com.courtservice.booking.entity.Booking;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

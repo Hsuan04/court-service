@@ -1,4 +1,4 @@
-package com.courtservice.booking;
+package com.courtservice.booking.entity;
 
 public enum BookingStatus {
     CONFIRMED,

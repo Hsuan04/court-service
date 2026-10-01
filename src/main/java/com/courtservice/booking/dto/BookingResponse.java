@@ -1,6 +1,6 @@
 package com.courtservice.booking.dto;
 
-import com.courtservice.booking.BookingStatus;
+import com.courtservice.booking.entity.BookingStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.OffsetDateTime;

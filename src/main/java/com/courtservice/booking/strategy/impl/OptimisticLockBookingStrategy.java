@@ -1,10 +1,10 @@
 package com.courtservice.booking.strategy.impl;
 
-import com.courtservice.booking.Booking;
-import com.courtservice.booking.BookingRepository;
+import com.courtservice.booking.entity.Booking;
+import com.courtservice.booking.repository.BookingRepository;
 import com.courtservice.booking.strategy.BookingConcurrencyMode;
 import com.courtservice.booking.strategy.BookingOutcome;
-import com.courtservice.booking.strategy.BookingProperties;
+import com.courtservice.booking.config.BookingProperties;
 import com.courtservice.booking.strategy.BookingStrategy;
 import com.courtservice.common.error.BusinessException;
 import com.courtservice.common.error.ErrorCode;

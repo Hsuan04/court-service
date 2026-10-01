@@ -1,7 +1,8 @@
 package com.courtservice.booking;
 
+import com.courtservice.booking.cache.SoldOutSessionCache;
 import com.courtservice.booking.strategy.BookingConcurrencyMode;
-import com.courtservice.booking.strategy.BookingProperties;
+import com.courtservice.booking.config.BookingProperties;
 import com.courtservice.common.error.BusinessException;
 import com.courtservice.common.error.ErrorCode;
 import com.courtservice.session.CourtSessionChangedEvent;

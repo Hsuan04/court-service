@@ -1,6 +1,6 @@
-package com.courtservice.booking;
+package com.courtservice.booking.cache;
 
-import com.courtservice.booking.strategy.BookingProperties;
+import com.courtservice.booking.config.BookingProperties;
 import com.courtservice.common.error.BusinessException;
 import com.courtservice.common.error.ErrorCode;
 import com.courtservice.session.CourtSessionChangedEvent;

@@ -1,7 +1,7 @@
 package com.courtservice;
 
-import com.courtservice.booking.Booking;
-import com.courtservice.booking.BookingRepository;
+import com.courtservice.booking.entity.Booking;
+import com.courtservice.booking.repository.BookingRepository;
 import com.courtservice.court.Court;
 import com.courtservice.court.CourtRepository;
 import com.courtservice.member.Member;

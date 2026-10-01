@@ -3,6 +3,8 @@ package com.courtservice.booking.strategy;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+
+import com.courtservice.booking.config.BookingProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;

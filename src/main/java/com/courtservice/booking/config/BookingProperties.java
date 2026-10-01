@@ -1,5 +1,7 @@
-package com.courtservice.booking.strategy;
+package com.courtservice.booking.config;
 
+import com.courtservice.booking.strategy.BookingConcurrencyMode;
+import com.courtservice.booking.strategy.BookingStrategy;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

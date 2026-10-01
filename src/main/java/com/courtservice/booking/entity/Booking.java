@@ -1,4 +1,4 @@
-package com.courtservice.booking;
+package com.courtservice.booking.entity;
 
 import com.courtservice.common.BaseEntity;
 import com.courtservice.member.Member;

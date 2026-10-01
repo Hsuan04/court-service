@@ -2,6 +2,7 @@ package com.courtservice.booking;
 
 import com.courtservice.TestcontainersConfiguration;
 import com.courtservice.IntegrationTestData;
+import com.courtservice.booking.cache.SoldOutSessionCache;
 import com.courtservice.member.Member;
 import com.courtservice.session.CourtSession;
 import jakarta.persistence.EntityManagerFactory;

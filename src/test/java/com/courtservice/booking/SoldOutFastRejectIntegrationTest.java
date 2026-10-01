@@ -2,7 +2,9 @@ package com.courtservice.booking;
 
 import com.courtservice.IntegrationTestData;
 import com.courtservice.TestcontainersConfiguration;
+import com.courtservice.booking.cache.SoldOutSessionCache;
 import com.courtservice.booking.dto.BookingCreateRequest;
+import com.courtservice.booking.service.BookingService;
 import com.courtservice.common.error.BusinessException;
 import com.courtservice.common.error.ErrorCode;
 import com.courtservice.session.CourtSessionService;

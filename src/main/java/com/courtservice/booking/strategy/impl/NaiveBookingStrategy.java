@@ -1,7 +1,7 @@
 package com.courtservice.booking.strategy.impl;
 
-import com.courtservice.booking.Booking;
-import com.courtservice.booking.BookingRepository;
+import com.courtservice.booking.entity.Booking;
+import com.courtservice.booking.repository.BookingRepository;
 import com.courtservice.booking.strategy.BookingConcurrencyMode;
 import com.courtservice.booking.strategy.BookingOutcome;
 import com.courtservice.booking.strategy.BookingStrategy;
@@ -17,19 +17,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
-public class NativeBookingStrategy implements BookingStrategy {
+public class NaiveBookingStrategy implements BookingStrategy {
 
-    private static final Logger log = LoggerFactory.getLogger(NativeBookingStrategy.class);
+    private static final Logger log = LoggerFactory.getLogger(NaiveBookingStrategy.class);
 
     private final CourtSessionService courtSessionService;
     private final MemberService memberService;
     private final BookingRepository bookingRepository;
     private final TransactionTemplate transactionTemplate;
 
-    public NativeBookingStrategy(CourtSessionService courtSessionService,
-                                 MemberService memberService,
-                                 BookingRepository bookingRepository,
-                                 TransactionTemplate transactionTemplate) {
+    public NaiveBookingStrategy(CourtSessionService courtSessionService,
+                                MemberService memberService,
+                                BookingRepository bookingRepository,
+                                TransactionTemplate transactionTemplate) {
         this.courtSessionService = courtSessionService;
         this.memberService = memberService;
         this.bookingRepository = bookingRepository;

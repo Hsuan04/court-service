@@ -1,11 +1,11 @@
-package com.courtservice.booking;
+package com.courtservice.booking.controller;
 
+import com.courtservice.booking.service.BookingService;
 import com.courtservice.booking.dto.BookingCreateRequest;
 import com.courtservice.booking.dto.BookingCreateResponse;
 import com.courtservice.booking.dto.BookingResponse;
 import com.courtservice.common.web.PageResponse;
 import com.courtservice.common.web.PaginationDefaults;
-import com.courtservice.session.CourtSession;
 import com.courtservice.session.CourtSessionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

@@ -1,5 +1,6 @@
 package com.courtservice.booking.strategy;
 
+import com.courtservice.booking.config.BookingProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;

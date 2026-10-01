@@ -1,8 +1,11 @@
-package com.courtservice.booking;
+package com.courtservice.booking.service;
 
+import com.courtservice.booking.cache.SoldOutSessionCache;
 import com.courtservice.booking.dto.BookingCreateRequest;
 import com.courtservice.booking.dto.BookingCreateResponse;
 import com.courtservice.booking.dto.BookingResponse;
+import com.courtservice.booking.entity.Booking;
+import com.courtservice.booking.repository.BookingRepository;
 import com.courtservice.booking.strategy.BookingOutcome;
 import com.courtservice.booking.strategy.BookingStrategyRegistry;
 import com.courtservice.common.error.BusinessException;

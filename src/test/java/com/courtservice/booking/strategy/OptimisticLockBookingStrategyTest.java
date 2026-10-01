@@ -1,6 +1,7 @@
 package com.courtservice.booking.strategy;
 
-import com.courtservice.booking.BookingRepository;
+import com.courtservice.booking.config.BookingProperties;
+import com.courtservice.booking.repository.BookingRepository;
 import com.courtservice.booking.strategy.impl.OptimisticLockBookingStrategy;
 import com.courtservice.common.error.BusinessException;
 import com.courtservice.common.error.ErrorCode;
