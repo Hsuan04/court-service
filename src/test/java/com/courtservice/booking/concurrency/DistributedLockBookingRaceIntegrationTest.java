@@ -213,7 +213,8 @@ class DistributedLockBookingRaceIntegrationTest extends BookingRaceIntegrationTe
     private DistributedLockBookingStrategy strategyWith(RedissonClient client, Duration waitTime, Duration debugHold) {
         BookingProperties properties = new BookingProperties(BookingConcurrencyMode.DISTRIBUTED_LOCK,
                 bookingProperties.optimisticRetry(), bookingProperties.soldOutCache(),
-                new BookingProperties.DistributedLock(waitTime, debugHold));
+                new BookingProperties.DistributedLock(waitTime, debugHold),
+                bookingProperties.jvmLock());
         return new DistributedLockBookingStrategy(courtSessionService, memberService, bookingRepository,
                 transactionTemplate, client, properties);
     }

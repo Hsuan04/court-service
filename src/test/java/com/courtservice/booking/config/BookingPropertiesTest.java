@@ -113,6 +113,34 @@ class BookingPropertiesTest {
     }
 
     @Test
+    void jvmLockDefaultsToThreeSecondWait() {
+        // given
+        Binder binder = new Binder(new MapConfigurationPropertySource(
+                Map.of(PREFIX + ".concurrency-mode", "jvm-lock")));
+
+        // when
+        BookingProperties properties = binder.bind(PREFIX, BookingProperties.class).get();
+
+        // then
+        assertThat(properties.concurrencyMode()).isEqualTo(BookingConcurrencyMode.JVM_LOCK);
+        assertThat(properties.jvmLock().waitTime()).isEqualTo(Duration.ofSeconds(3));
+    }
+
+    @Test
+    void jvmLockBindsConfiguredWaitTime() {
+        // given
+        Binder binder = new Binder(new MapConfigurationPropertySource(Map.of(
+                PREFIX + ".concurrency-mode", "jvm-lock",
+                PREFIX + ".jvm-lock.wait-time", "750ms")));
+
+        // when
+        BookingProperties properties = binder.bind(PREFIX, BookingProperties.class).get();
+
+        // then
+        assertThat(properties.jvmLock().waitTime()).isEqualTo(Duration.ofMillis(750));
+    }
+
+    @Test
     void optimisticRetryRejectsMaxBackoffShorterThanMinBackoff() {
         assertThatThrownBy(() -> new BookingProperties.OptimisticRetry(5, Duration.ofSeconds(5), Duration.ofSeconds(1)))
                 .isInstanceOf(IllegalArgumentException.class);

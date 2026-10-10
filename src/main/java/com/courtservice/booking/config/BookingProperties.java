@@ -18,6 +18,7 @@ import java.time.Duration;
  * @param soldOutCache    settings of the in-memory sold-out flag that rejects bookings of a full
  *                        session before any strategy runs
  * @param distributedLock settings of the {@code distributed-lock} strategy
+ * @param jvmLock         settings of the {@code jvm-lock} strategy
  */
 @Validated
 @ConfigurationProperties("app.booking")
@@ -25,7 +26,17 @@ public record BookingProperties(
         @NotNull BookingConcurrencyMode concurrencyMode,
         @Valid @DefaultValue OptimisticRetry optimisticRetry,
         @Valid @DefaultValue SoldOutCache soldOutCache,
-        @Valid @DefaultValue DistributedLock distributedLock) {
+        @Valid @DefaultValue DistributedLock distributedLock,
+        @Valid @DefaultValue JvmLock jvmLock) {
+
+    /**
+     * Settings of the jvm-lock strategy, bound from {@code app.booking.jvm-lock.*}.
+     *
+     * @param waitTime longest wait for a session's lock before the booking fails with
+     *                 {@code LOCK_TIMEOUT}
+     */
+    public record JvmLock(@NotNull @DefaultValue("3s") Duration waitTime) {
+    }
 
     /**
      * Settings of the distributed-lock strategy, bound from {@code app.booking.distributed-lock.*}.

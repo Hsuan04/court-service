@@ -21,15 +21,21 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
 
 /**
- * Read-only endpoints for bookings, including the booking sub-resources of sessions and members.
+ * Endpoints to create, cancel and query bookings, including the booking sub-resources of sessions
+ * and members.
  */
-@Tag(name = "Bookings", description = "Query bookings")
+@Tag(name = "Bookings", description = "Create, cancel and query bookings")
 @RestController
 public class BookingController {
 
@@ -93,6 +99,32 @@ public class BookingController {
     @GetMapping("/api/bookings/{id}")
     public BookingResponse get(@Parameter(description = "The booking id.", example = "1") @PathVariable Long id) {
         return bookingService.get(id);
+    }
+
+    @Operation(summary = "Cancel a booking",
+            description = "Cancels a confirmed booking and gives its seat back to the court session. The booking "
+                    + "is kept with status CANCELLED, so it can still be read, and the member may book the "
+                    + "session again.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "The booking was cancelled."),
+            @ApiResponse(responseCode = "400", description = "The id is not a valid number.",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(ref = PROBLEM_DETAIL_REF))),
+            @ApiResponse(responseCode = "404", description = "No booking has the given id.",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(ref = PROBLEM_DETAIL_REF))),
+            @ApiResponse(responseCode = "409", description = "The booking has already been cancelled "
+                    + "(BOOKING_ALREADY_CANCELLED).",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(ref = PROBLEM_DETAIL_REF))),
+            @ApiResponse(responseCode = "500", description = "An unexpected server error occurred.",
+                    content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(ref = PROBLEM_DETAIL_REF)))
+    })
+    @DeleteMapping("/api/bookings/{id}")
+    public ResponseEntity<Void> cancel(@Parameter(description = "The booking id.", example = "1") @PathVariable Long id) {
+        bookingService.cancel(id);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "List bookings of a court session",

@@ -5,6 +5,7 @@ import com.courtservice.booking.dto.BookingCreateRequest;
 import com.courtservice.booking.dto.BookingCreateResponse;
 import com.courtservice.booking.dto.BookingResponse;
 import com.courtservice.booking.entity.Booking;
+import com.courtservice.booking.event.BookingCancelledEvent;
 import com.courtservice.booking.repository.BookingRepository;
 import com.courtservice.booking.strategy.BookingOutcome;
 import com.courtservice.booking.strategy.BookingStrategyRegistry;
@@ -15,6 +16,7 @@ import com.courtservice.member.MemberService;
 import com.courtservice.session.CourtSessionService;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,8 +24,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
+
 /**
- * Read-only queries over bookings. Depends on the session and member modules through their
+ * Creates, cancels and queries bookings. Depends on the session and member modules through their
  * services only.
  *
  * <p>Responses expose the associated session and member by id, read from the lazy proxies via
@@ -42,15 +46,17 @@ public class BookingService {
     private final MemberService memberService;
     private final BookingStrategyRegistry bookingStrategyRegistry;
     private final SoldOutSessionCache soldOutSessionCache;
+    private final ApplicationEventPublisher eventPublisher;
 
     public BookingService(BookingRepository bookingRepository, CourtSessionService courtSessionService,
                           MemberService memberService, BookingStrategyRegistry bookingStrategyRegistry,
-                          SoldOutSessionCache soldOutSessionCache) {
+                          SoldOutSessionCache soldOutSessionCache, ApplicationEventPublisher eventPublisher) {
         this.bookingRepository = bookingRepository;
         this.courtSessionService = courtSessionService;
         this.memberService = memberService;
         this.bookingStrategyRegistry = bookingStrategyRegistry;
         this.soldOutSessionCache = soldOutSessionCache;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -148,6 +154,43 @@ public class BookingService {
         log.info("Created booking {} for session {} by member {} (bookedCount={}/{})", booking.id(),
                 request.courtSessionId(), request.memberId(), outcome.bookedCount(), outcome.capacity());
         return new BookingCreateResponse(booking, outcome.capacity(), outcome.bookedCount());
+    }
+
+    /**
+     * Cancels a booking and gives its seat back to the session. The booking row is kept with status
+     * {@code CANCELLED}, and the member may book the session again.
+     *
+     * <p>The same for every concurrency strategy, because both writes are conditional statements:
+     * the booking changes only if it is still confirmed, so of two concurrent cancellations exactly
+     * one succeeds, and {@code booked_count} drops by one only for that one. The seat release also
+     * raises the session's version, so a lock-based booking that read the old count at the same
+     * moment fails with {@code CONCURRENT_MODIFICATION} instead of overwriting the release.
+     *
+     * <p>State outside the database (the Redis seat stock and the sold-out flag) follows through a
+     * {@link BookingCancelledEvent} handled after commit, so a rolled-back cancellation never gives
+     * a seat back there.
+     *
+     * @param id the booking id
+     * @throws ResourceNotFoundException if no booking has the given id
+     * @throws BusinessException         with {@code BOOKING_ALREADY_CANCELLED} if the booking was
+     *                                   already cancelled
+     */
+    @Transactional
+    public void cancel(Long id) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(RESOURCE_NAME, id));
+        // Read before the conditional update clears the persistence context; getId() needs no query.
+        Long courtSessionId = booking.getCourtSession().getId();
+        Long memberId = booking.getMember().getId();
+
+        if (bookingRepository.cancelIfConfirmed(id, OffsetDateTime.now()) == 0) {
+            log.info("Booking {}: cancellation rejected, already cancelled", id);
+            throw new BusinessException(ErrorCode.BOOKING_ALREADY_CANCELLED,
+                    ErrorCode.BOOKING_ALREADY_CANCELLED.getDefaultDetail());
+        }
+        courtSessionService.releaseSeat(courtSessionId);
+        eventPublisher.publishEvent(new BookingCancelledEvent(id, courtSessionId, memberId));
+        log.info("Cancelled booking {} of session {}", id, courtSessionId);
     }
 
     private static boolean violatesSessionMemberUniqueness(DataIntegrityViolationException exception) {

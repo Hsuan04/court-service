@@ -182,7 +182,8 @@ class DistributedLockBookingStrategyTest {
         BookingProperties properties = new BookingProperties(BookingConcurrencyMode.DISTRIBUTED_LOCK,
                 new BookingProperties.OptimisticRetry(1, Duration.ZERO, Duration.ZERO),
                 new BookingProperties.SoldOutCache(false, Duration.ZERO, 1),
-                new BookingProperties.DistributedLock(WAIT_TIME, debugHold));
+                new BookingProperties.DistributedLock(WAIT_TIME, debugHold),
+                new BookingProperties.JvmLock(Duration.ZERO));
         return new DistributedLockBookingStrategy(mock(CourtSessionService.class), mock(MemberService.class),
                 mock(BookingRepository.class), transactionTemplate, redissonClient, properties);
     }

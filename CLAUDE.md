@@ -6,7 +6,7 @@ The core problem: many members booking the same session at once must never excee
 ## Tech Stack
 - Java 21, Spring Boot 4.1.1, Maven
 - PostgreSQL 17, Flyway, Spring Data JPA, Lombok
-- Redis 7.4 with Redisson (distributed booking lock), Caffeine (sold-out flag)
+- Redis 7.4 with Redisson (distributed booking lock, and the seat stock of the `redis-cache` / `redis-lua` strategies via Lua scripts), Caffeine (sold-out flag)
 - springdoc-openapi (Swagger UI)
 - JUnit 5, AssertJ, Mockito, Testcontainers
 
@@ -18,7 +18,7 @@ The core problem: many members booking the same session at once must never excee
 - Reset local database: `docker compose down -v`
 - Redis: started by Spring Boot Docker Compose together with PostgreSQL; it has no volume and persistence is off, so every start begins with an empty Redis. Open a CLI with `docker compose exec redis redis-cli`
 - Spring Boot Docker Compose runs `docker compose up` only when no service is running; if PostgreSQL is already up from an earlier run, start the other services once with `docker compose up -d`
-- RedisInsight (local lock inspection only): http://localhost:5540. `RI_REDIS_HOST`/`RI_REDIS_PORT` request a preconfigured connection, but it may not be listed; if so, add host `redis`, port `6379` (the compose service name, not `localhost`, since RedisInsight runs in its own container). Booking locks are the keys `lock:court-session:{id}`
+- RedisInsight (local inspection of locks and seat stock): http://localhost:5540. `RI_REDIS_HOST`/`RI_REDIS_PORT` request a preconfigured connection, but it may not be listed; if so, add host `redis`, port `6379` (the compose service name, not `localhost`, since RedisInsight runs in its own container). Booking locks are the keys `lock:court-session:{id}`; the seat stock keys are `booking:{court-session:{id}}:stock` and `booking:{court-session:{id}}:members`
 - Held booking locks: http://localhost:8080/actuator/bookinglocks (local profile and `distributed-lock` mode only). The local profile keeps each lock for 10s (`app.booking.distributed-lock.debug-hold`) so it can be observed; tests reset it to 0s in `src/test/resources/config/application-local.yaml`
 - Swagger UI: http://localhost:8080/swagger-ui.html
 - Health check: http://localhost:8080/api/health

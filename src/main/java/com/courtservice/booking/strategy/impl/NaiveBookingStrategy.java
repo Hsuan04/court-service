@@ -1,6 +1,7 @@
 package com.courtservice.booking.strategy.impl;
 
 import com.courtservice.booking.entity.Booking;
+import com.courtservice.booking.entity.BookingStatus;
 import com.courtservice.booking.repository.BookingRepository;
 import com.courtservice.booking.strategy.BookingConcurrencyMode;
 import com.courtservice.booking.strategy.BookingOutcome;
@@ -52,7 +53,8 @@ public class NaiveBookingStrategy implements BookingStrategy {
         Member member = memberService.findMember(memberId);
 
         // 2. Check duplicate: itself a check-then-act race
-        if (bookingRepository.existsByCourtSessionIdAndMemberId(courtSessionId, memberId)) {
+        if (bookingRepository.existsByCourtSessionIdAndMemberIdAndStatus(courtSessionId, memberId,
+                BookingStatus.CONFIRMED)) {
             throw new BusinessException(ErrorCode.DUPLICATE_BOOKING, ErrorCode.DUPLICATE_BOOKING.getDefaultDetail());
         }
 

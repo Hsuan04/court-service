@@ -2,6 +2,7 @@ package com.courtservice.booking.strategy.impl;
 
 import com.courtservice.booking.config.BookingProperties;
 import com.courtservice.booking.entity.Booking;
+import com.courtservice.booking.entity.BookingStatus;
 import com.courtservice.booking.lock.BookingLockKeys;
 import com.courtservice.booking.repository.BookingRepository;
 import com.courtservice.booking.strategy.BookingConcurrencyMode;
@@ -136,7 +137,8 @@ public class DistributedLockBookingStrategy implements BookingStrategy {
         CourtSession session = courtSessionService.findSession(courtSessionId);
         Member member = memberService.findMember(memberId);
 
-        if (bookingRepository.existsByCourtSessionIdAndMemberId(courtSessionId, memberId)) {
+        if (bookingRepository.existsByCourtSessionIdAndMemberIdAndStatus(courtSessionId, memberId,
+                BookingStatus.CONFIRMED)) {
             throw new BusinessException(ErrorCode.DUPLICATE_BOOKING, ErrorCode.DUPLICATE_BOOKING.getDefaultDetail());
         }
         if (session.isFull()) {

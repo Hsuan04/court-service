@@ -16,6 +16,8 @@ import com.courtservice.member.MemberService;
 import com.courtservice.member.dto.MemberCreateRequest;
 import com.courtservice.session.CourtSessionService;
 import com.courtservice.session.dto.CourtSessionCreateRequest;
+import com.courtservice.session.dto.CourtSessionResponse;
+import com.courtservice.session.dto.CourtSessionUpdateRequest;
 import com.courtservice.support.IntegrationTestData;
 import com.courtservice.support.RedisTestData;
 import com.courtservice.support.TestcontainersConfiguration;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -107,6 +110,13 @@ abstract class BookingRaceIntegrationTestBase {
     private SoldOutSessionCache soldOutSessionCache;
 
     @Autowired
+    ApplicationEventPublisher eventPublisher;
+
+    /** The application's own service, a Spring proxy, used for cancellations; see {@link #cancel(long)}. */
+    @Autowired
+    private BookingService applicationBookingService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private IntegrationTestData data;
@@ -135,6 +145,13 @@ abstract class BookingRaceIntegrationTestBase {
         OffsetDateTime now = OffsetDateTime.now();
         return courtSessionService.create(new CourtSessionCreateRequest(courtId, LocalDate.now().plusDays(1),
                 SESSION_START, SESSION_END, capacity, now.minusHours(1), now.plusDays(1))).id();
+    }
+
+    /** Changes the capacity of a session through the service, keeping its schedule. */
+    void changeCapacity(long sessionId, int capacity) {
+        CourtSessionResponse session = courtSessionService.get(sessionId);
+        courtSessionService.update(sessionId, new CourtSessionUpdateRequest(session.sessionDate(),
+                session.startTime(), session.endTime(), capacity, session.openAt(), session.closeAt()));
     }
 
     /** Step 3: creates the members who will compete for the seats. */
@@ -195,6 +212,16 @@ abstract class BookingRaceIntegrationTestBase {
         }
     }
 
+    /**
+     * Cancels a booking through the application's {@link BookingService} bean. The services built
+     * by {@link #bookingServiceUsing(BookingStrategy)} are plain objects, not Spring proxies, so
+     * {@code cancel}'s {@code @Transactional} would not apply to them. Cancellation does not depend
+     * on the strategy, so the bean's configured strategy does not matter.
+     */
+    void cancel(long bookingId) {
+        applicationBookingService.cancel(bookingId);
+    }
+
     // ---- Strategy wiring ------------------------------------------------------------------------
 
     /** The strategy bean implementing a mode. */
@@ -207,10 +234,11 @@ abstract class BookingRaceIntegrationTestBase {
         BookingProperties.SoldOutCache configured = bookingProperties.soldOutCache();
         BookingProperties properties = new BookingProperties(strategy.mode(), bookingProperties.optimisticRetry(),
                 new BookingProperties.SoldOutCache(false, configured.ttl(), configured.maximumSize()),
-                bookingProperties.distributedLock());
+                bookingProperties.distributedLock(),
+                bookingProperties.jvmLock());
         BookingStrategyRegistry registry = new BookingStrategyRegistry(List.of(strategy), properties);
         return new BookingService(bookingRepository, courtSessionService, memberService, registry,
-                new SoldOutSessionCache(properties, new SimpleMeterRegistry()));
+                new SoldOutSessionCache(properties, new SimpleMeterRegistry()), eventPublisher);
     }
 
     // ---- Checks and report ----------------------------------------------------------------------
@@ -218,6 +246,12 @@ abstract class BookingRaceIntegrationTestBase {
     int bookingRows(long sessionId) {
         return jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM booking WHERE court_session_id = ?", Integer.class, sessionId);
+    }
+
+    int confirmedBookingRows(long sessionId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM booking WHERE court_session_id = ? AND status = 'CONFIRMED'", Integer.class,
+                sessionId);
     }
 
     int bookedCount(long sessionId) {

@@ -41,7 +41,9 @@ public enum ErrorCode {
     DUPLICATE_BOOKING(HttpStatus.CONFLICT, "Duplicate Booking",
             "The member has already booked this court session."),
     LOCK_TIMEOUT(HttpStatus.CONFLICT, "Lock Timeout",
-            "Too many bookings for this court session at once. Please retry.");
+            "Too many bookings for this court session at once. Please retry."),
+    BOOKING_ALREADY_CANCELLED(HttpStatus.CONFLICT, "Booking Already Cancelled",
+            "The booking has already been cancelled.");
 
     private static final String PROBLEM_TYPE_BASE_URI = "https://court-service.example/problems/";
 

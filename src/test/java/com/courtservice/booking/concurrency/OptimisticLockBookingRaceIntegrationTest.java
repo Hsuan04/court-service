@@ -62,7 +62,8 @@ class OptimisticLockBookingRaceIntegrationTest extends BookingRaceIntegrationTes
     private OptimisticLockBookingStrategy fastRetryStrategy() {
         BookingProperties properties = new BookingProperties(BookingConcurrencyMode.OPTIMISTIC_LOCK,
                 new BookingProperties.OptimisticRetry(MAX_ATTEMPTS, MIN_BACKOFF, MAX_BACKOFF),
-                bookingProperties.soldOutCache(), bookingProperties.distributedLock());
+                bookingProperties.soldOutCache(), bookingProperties.distributedLock(),
+                bookingProperties.jvmLock());
         return new OptimisticLockBookingStrategy(courtSessionService, memberService, bookingRepository,
                 transactionTemplate, properties);
     }

@@ -84,7 +84,8 @@ public class CourtSessionService {
      * the exception rolls back the whole transaction, so no partial update is persisted.
      *
      * <p>Publishes a {@link CourtSessionChangedEvent}; listeners that act after commit see the new
-     * capacity.
+     * capacity. When the capacity changed, also publishes a {@link CourtSessionCapacityChangedEvent}
+     * with the difference.
      *
      * @param id      the session id
      * @param request the new schedule and capacity
@@ -97,6 +98,7 @@ public class CourtSessionService {
     @Transactional
     public CourtSessionResponse update(Long id, CourtSessionUpdateRequest request) {
         CourtSession session = findSession(id);
+        int previousCapacity = session.getCapacity();
         session.reschedule(request.sessionDate(), request.startTime(), request.endTime(),
                 request.openAt(), request.closeAt());
         session.changeCapacity(request.capacity());
@@ -104,14 +106,11 @@ public class CourtSessionService {
         courtSessionRepository.flush();
         log.info("Updated court session {}", id);
         eventPublisher.publishEvent(new CourtSessionChangedEvent(id));
+        int capacityDelta = session.getCapacity() - previousCapacity;
+        if (capacityDelta != 0) {
+            eventPublisher.publishEvent(new CourtSessionCapacityChangedEvent(id, capacityDelta));
+        }
         return toResponse(session);
-    }
-
-    @Transactional
-    public CourtSession update(CourtSession courtSession) {
-        courtSessionRepository.saveAndFlush(courtSession);
-        log.info("Updated court session {}", courtSession.getCourt().getId());
-        return courtSession;
     }
 
     /**
@@ -192,6 +191,23 @@ public class CourtSessionService {
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<BookedCountSnapshot> incrementBookedCountIfAvailable(Long id) {
         return courtSessionRepository.incrementBookedCountIfAvailable(id, OffsetDateTime.now());
+    }
+
+    /**
+     * Gives back one seat of a session for a cancelled booking, with a single conditional
+     * {@code UPDATE} that also raises the version, so a concurrent booking that read the old count
+     * fails its version check rather than overwriting this change.
+     *
+     * @param id the session id
+     * @throws IllegalStateException if the session has no booked seat to give back, which means
+     *                               {@code booked_count} no longer matches the confirmed bookings;
+     *                               the caller's transaction is rolled back rather than hiding it
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void releaseSeat(Long id) {
+        if (courtSessionRepository.decrementBookedCountIfBooked(id, OffsetDateTime.now()) == 0) {
+            throw new IllegalStateException("Court session " + id + " has no booked seat to release");
+        }
     }
 
     /**

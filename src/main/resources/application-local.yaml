@@ -29,6 +29,8 @@ app:
       # /actuator/bookinglocks. A second booking of the same session meanwhile gets LOCK_TIMEOUT
       # after wait-time. Never set this outside local; tests reset it to 0s.
       debug-hold: 10s
+    jvm-lock:
+      wait-time: 3s      # Longest wait for a session's in-memory lock before LOCK_TIMEOUT
 
 management:
   endpoints:

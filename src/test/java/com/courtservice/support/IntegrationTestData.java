@@ -54,9 +54,13 @@ public final class IntegrationTestData {
     }
 
     public long insertBooking(long courtSessionId, long memberId) {
+        return insertBooking(courtSessionId, memberId, CONFIRMED);
+    }
+
+    public long insertBooking(long courtSessionId, long memberId, String status) {
         return jdbcTemplate.queryForObject(
                 "INSERT INTO booking (court_session_id, member_id, status) VALUES (?, ?, ?) RETURNING id",
-                Long.class, courtSessionId, memberId, CONFIRMED);
+                Long.class, courtSessionId, memberId, status);
     }
 
     public void setBookedCount(long courtSessionId, int bookedCount) {

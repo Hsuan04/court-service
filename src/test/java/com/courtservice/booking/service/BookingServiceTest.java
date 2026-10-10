@@ -4,6 +4,7 @@ import com.courtservice.booking.cache.SoldOutSessionCache;
 import com.courtservice.booking.config.BookingProperties;
 import com.courtservice.booking.dto.BookingCreateRequest;
 import com.courtservice.booking.entity.Booking;
+import com.courtservice.booking.event.BookingCancelledEvent;
 import com.courtservice.booking.repository.BookingRepository;
 import com.courtservice.booking.strategy.BookingConcurrencyMode;
 import com.courtservice.booking.strategy.BookingOutcome;
@@ -11,42 +12,55 @@ import com.courtservice.booking.strategy.BookingStrategy;
 import com.courtservice.booking.strategy.BookingStrategyRegistry;
 import com.courtservice.common.error.BusinessException;
 import com.courtservice.common.error.ErrorCode;
+import com.courtservice.common.error.ResourceNotFoundException;
 import com.courtservice.member.MemberService;
 import com.courtservice.session.CourtSessionService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
  * Covers what {@code create} adds around the strategy: the translation of the booking unique
  * constraint, which only a real race can trigger, and the sold-out flag. Stubbing the strategy
- * makes both deterministic.
+ * makes both deterministic. Also covers the decisions {@code cancel} makes around its two
+ * conditional updates.
  */
 class BookingServiceTest {
 
     private static final long SESSION_ID = 1L;
     private static final long MEMBER_ID = 2L;
+    private static final long BOOKING_ID = 3L;
     private static final int CAPACITY = 10;
     private static final BookingCreateRequest REQUEST = new BookingCreateRequest(SESSION_ID, MEMBER_ID);
     private static final BookingProperties PROPERTIES = new BookingProperties(BookingConcurrencyMode.SYNCHRONIZED,
             new BookingProperties.OptimisticRetry(1, Duration.ZERO, Duration.ZERO),
             new BookingProperties.SoldOutCache(true, Duration.ofMinutes(1), 100),
-            new BookingProperties.DistributedLock(Duration.ZERO, Duration.ZERO));
+            new BookingProperties.DistributedLock(Duration.ZERO, Duration.ZERO),
+            new BookingProperties.JvmLock(Duration.ZERO));
 
     private BookingStrategy strategy;
     private SoldOutSessionCache soldOutSessionCache;
+    private BookingRepository bookingRepository;
+    private CourtSessionService courtSessionService;
+    private ApplicationEventPublisher eventPublisher;
     private BookingService bookingService;
 
     @BeforeEach
@@ -55,8 +69,52 @@ class BookingServiceTest {
         BookingStrategyRegistry registry = mock(BookingStrategyRegistry.class);
         when(registry.active()).thenReturn(strategy);
         soldOutSessionCache = new SoldOutSessionCache(PROPERTIES, new SimpleMeterRegistry());
-        bookingService = new BookingService(mock(BookingRepository.class), mock(CourtSessionService.class),
-                mock(MemberService.class), registry, soldOutSessionCache);
+        bookingRepository = mock(BookingRepository.class);
+        courtSessionService = mock(CourtSessionService.class);
+        eventPublisher = mock(ApplicationEventPublisher.class);
+        bookingService = new BookingService(bookingRepository, courtSessionService, mock(MemberService.class),
+                registry, soldOutSessionCache, eventPublisher);
+    }
+
+    @Test
+    void cancelOfAnUnknownBookingIsNotFound() {
+        // given
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.empty());
+
+        // when / then
+        assertThatThrownBy(() -> bookingService.cancel(BOOKING_ID))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verifyNoInteractions(courtSessionService, eventPublisher);
+    }
+
+    @Test
+    void cancelOfAnAlreadyCancelledBookingIsRejectedWithoutReleasingASeat() {
+        // given
+        Booking booking = booking();
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(bookingRepository.cancelIfConfirmed(eq(BOOKING_ID), any(OffsetDateTime.class))).thenReturn(0);
+
+        // when / then
+        assertThatThrownBy(() -> bookingService.cancel(BOOKING_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.BOOKING_ALREADY_CANCELLED);
+        verifyNoInteractions(courtSessionService, eventPublisher);
+    }
+
+    @Test
+    void cancelReleasesTheSeatAndPublishesTheCancellation() {
+        // given
+        Booking booking = booking();
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(bookingRepository.cancelIfConfirmed(eq(BOOKING_ID), any(OffsetDateTime.class))).thenReturn(1);
+
+        // when
+        bookingService.cancel(BOOKING_ID);
+
+        // then
+        verify(courtSessionService).releaseSeat(SESSION_ID);
+        verify(eventPublisher).publishEvent(new BookingCancelledEvent(BOOKING_ID, SESSION_ID, MEMBER_ID));
     }
 
     @Test
@@ -140,5 +198,13 @@ class BookingServiceTest {
     private static DataIntegrityViolationException constraintViolation(String constraintName) {
         return new DataIntegrityViolationException("could not execute statement",
                 new ConstraintViolationException("constraint violated", new SQLException(), constraintName));
+    }
+
+    /** A confirmed booking of {@link #SESSION_ID} by {@link #MEMBER_ID}, read only through its ids. */
+    private static Booking booking() {
+        Booking booking = mock(Booking.class, RETURNS_DEEP_STUBS);
+        when(booking.getCourtSession().getId()).thenReturn(SESSION_ID);
+        when(booking.getMember().getId()).thenReturn(MEMBER_ID);
+        return booking;
     }
 }

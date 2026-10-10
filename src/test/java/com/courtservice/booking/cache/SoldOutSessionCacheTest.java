@@ -1,6 +1,7 @@
 package com.courtservice.booking.cache;
 
 import com.courtservice.booking.config.BookingProperties;
+import com.courtservice.booking.event.BookingCancelledEvent;
 import com.courtservice.booking.strategy.BookingConcurrencyMode;
 import com.courtservice.common.error.BusinessException;
 import com.courtservice.common.error.ErrorCode;
@@ -25,6 +26,8 @@ class SoldOutSessionCacheTest {
 
     private static final long SESSION_ID = 1L;
     private static final long OTHER_SESSION_ID = 2L;
+    private static final long BOOKING_ID = 3L;
+    private static final long MEMBER_ID = 4L;
     private static final Duration TTL = Duration.ofSeconds(5);
     private static final long MAXIMUM_SIZE = 100;
     private static final BookingConcurrencyMode MODE = BookingConcurrencyMode.SYNCHRONIZED;
@@ -103,6 +106,19 @@ class SoldOutSessionCacheTest {
     }
 
     @Test
+    void cancellationClearsTheFlag() {
+        // given
+        SoldOutSessionCache cache = cache(true);
+        cache.markSoldOut(SESSION_ID);
+
+        // when
+        cache.onBookingCancelled(new BookingCancelledEvent(BOOKING_ID, SESSION_ID, MEMBER_ID));
+
+        // then
+        assertThat(cache.isSoldOut(SESSION_ID)).isFalse();
+    }
+
+    @Test
     void disabledCacheNeverReportsSoldOut() {
         // given
         SoldOutSessionCache cache = cache(false);
@@ -160,7 +176,8 @@ class SoldOutSessionCacheTest {
         BookingProperties properties = new BookingProperties(MODE,
                 new BookingProperties.OptimisticRetry(1, Duration.ZERO, Duration.ZERO),
                 new BookingProperties.SoldOutCache(enabled, TTL, MAXIMUM_SIZE),
-                new BookingProperties.DistributedLock(Duration.ZERO, Duration.ZERO));
+                new BookingProperties.DistributedLock(Duration.ZERO, Duration.ZERO),
+                new BookingProperties.JvmLock(Duration.ZERO));
         return new SoldOutSessionCache(properties, meterRegistry, nanos::get);
     }
 

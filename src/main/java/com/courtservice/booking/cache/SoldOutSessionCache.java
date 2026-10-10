@@ -1,6 +1,7 @@
 package com.courtservice.booking.cache;
 
 import com.courtservice.booking.config.BookingProperties;
+import com.courtservice.booking.event.BookingCancelledEvent;
 import com.courtservice.common.error.BusinessException;
 import com.courtservice.common.error.ErrorCode;
 import com.courtservice.session.CourtSessionChangedEvent;
@@ -26,10 +27,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *
  * <p>Trade-offs:
  * <ul>
- *   <li>A flag lives until its TTL expires. A seat freed in the meantime (a raised capacity seen
- *       by another instance, or a future cancellation) is wrongly refused until then.</li>
- *   <li>Changing or deleting a session clears the flag on this instance after the change commits;
- *       other instances wait for the TTL. A cancellation flow must call {@link #evict(Long)}.</li>
+ *   <li>A flag lives until its TTL expires. A seat freed in the meantime (a raised capacity or a
+ *       cancellation seen by another instance) is wrongly refused until then.</li>
+ *   <li>Changing or deleting a session, or cancelling one of its bookings, clears the flag on this
+ *       instance after the change commits; other instances wait for the TTL.</li>
  *   <li>A request that read the session just before such a change can set the flag again right
  *       after it was cleared; the TTL bounds how long that stale flag survives.</li>
  * </ul>
@@ -142,6 +143,18 @@ public class SoldOutSessionCache {
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onSessionChanged(CourtSessionChangedEvent event) {
+        evict(event.courtSessionId());
+    }
+
+    /**
+     * Clears the flag of a session after one of its bookings was cancelled, since a seat is free
+     * again. Runs after commit for the same reason as {@link #onSessionChanged}; other instances
+     * wait for the TTL.
+     *
+     * @param event the cancellation
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onBookingCancelled(BookingCancelledEvent event) {
         evict(event.courtSessionId());
     }
 }

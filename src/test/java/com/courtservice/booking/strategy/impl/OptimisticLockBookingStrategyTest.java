@@ -49,7 +49,8 @@ class OptimisticLockBookingStrategyTest {
     /** No wait between attempts, so the retry loop runs instantly. */
     private static final BookingProperties PROPERTIES = new BookingProperties(BookingConcurrencyMode.OPTIMISTIC_LOCK,
             new BookingProperties.OptimisticRetry(MAX_ATTEMPTS, Duration.ZERO, Duration.ZERO), SOLD_OUT_FLAG_OFF,
-            new BookingProperties.DistributedLock(Duration.ZERO, Duration.ZERO));
+            new BookingProperties.DistributedLock(Duration.ZERO, Duration.ZERO),
+            new BookingProperties.JvmLock(Duration.ZERO));
 
     private CourtSessionService courtSessionService;
     private TransactionTemplate transactionTemplate;
