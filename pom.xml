@@ -29,6 +29,9 @@
     <properties>
         <java.version>21</java.version>
         <datasource-proxy.version>1.11.0</datasource-proxy.version>
+        <redisson.version>4.7.0</redisson.version>
+        <!-- Timing-dependent load simulations stay out of the default build; clear with -Dsurefire.excludedGroups= -->
+        <surefire.excludedGroups>simulation</surefire.excludedGroups>
     </properties>
     <dependencies>
         <dependency>
@@ -63,6 +66,15 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>3.1.1</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson</artifactId>
+            <version>${redisson.version}</version>
         </dependency>
         <dependency>
             <groupId>net.ttddyy</groupId>
@@ -138,6 +150,7 @@
                     <systemPropertyVariables>
                         <spring.profiles.active>local</spring.profiles.active>
                     </systemPropertyVariables>
+                    <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
             <plugin>

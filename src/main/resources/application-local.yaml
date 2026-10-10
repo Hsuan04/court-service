@@ -1,14 +1,44 @@
-# Local profile: running the application on a developer machine and running the test suite.
-#
-# The default log directory below is a path on the original author's machine. If you use this
-# profile, either change the default to a directory on your own machine or override it by
-# setting the LOG_PATH environment variable, for example:
-#   LOG_PATH=./logs ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
-# CI sets LOG_PATH=./logs so that logs are written inside the project.
-#
-# This file is committed: it must never contain secrets.
+app:
+  logging:
+    sql:
+      log-all-queries: true
+      log-parameters: true
+  booking:
+    concurrency-mode: distributed-lock
+      #   Booking concurrency strategy
+      #   naive            - read-check-write, no protection (intentionally oversells)
+      #   synchronized     - one JVM-wide lock; all bookings queue on the same lock
+      #   jvm-lock         - one ReentrantLock per session; only same-session bookings queue
+      #   pessimistic-lock - SELECT ... FOR UPDATE on the session row
+      #   optimistic-lock  - @Version check, retried in a new transaction
+      #   atomic-update    - single conditional UPDATE (booked_count < capacity)
+      #   distributed-lock - Redisson lock per session in Redis, shared by every instance
+      #   redis-cache      - Redis DECR pre-deducts seats, then writes to DB
+      #   redis-lua        - Lua script atomically checks and deducts in Redis
+    optimistic-retry:  # Used only by optimistic-lock: after a version conflict, wait a random time in
+      max-attempts: 5
+      min-backoff: 1s
+      max-backoff: 5s
+    sold-out-cache:  # Fast reject: remember per session, on this instance only, that it is full
+      enabled: true
+      ttl: 5s  # How long a sold-out flag lives; longer rejects more requests early but may wrongly reject after a seat is freed
+      maximum-size: 10000
+    distributed-lock:
+      wait-time: 3s      # Longest wait for a session's lock before LOCK_TIMEOUT
+      # Observation only: keep every lock for 10s so it can be inspected in RedisInsight or
+      # /actuator/bookinglocks. A second booking of the same session meanwhile gets LOCK_TIMEOUT
+      # after wait-time. Never set this outside local; tests reset it to 0s.
+      debug-hold: 10s
+    jvm-lock:
+      wait-time: 3s      # Longest wait for a session's in-memory lock before LOCK_TIMEOUT
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,bookinglocks   # bookinglocks is exposed in local only
+
 logging:
-  # Human-readable text instead of JSON; console and file share the same pattern.
   structured:
     format:
       console: ""
@@ -24,8 +54,4 @@ logging:
     rollingpolicy:
       file-name-pattern: ${LOG_PATH:/Users/lawrencecheng/Desktop/CourtService/log}/court-service-%d{yyyy-MM-dd}.%i.log
 
-app:
-  logging:
-    sql:
-      log-all-queries: true
-      log-parameters: true
+

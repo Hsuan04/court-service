@@ -10,5 +10,26 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+  # Holds the distributed booking locks. No volume and persistence disabled, so every start of
+  # the application begins with an empty Redis.
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+
+  # Local inspection only; ignored by Spring Boot Docker Compose, so no connection is configured
+  # for it. Open http://localhost:5540; if the preconfigured connection is not listed, add host
+  # "redis", port 6379.
+  redisinsight:
+    image: redis/redisinsight:3.8.0
+    environment:
+      RI_REDIS_HOST: redis
+      RI_REDIS_PORT: "6379"
+    ports:
+      - "5540:5540"
+    labels:
+      org.springframework.boot.ignore: "true"
+
 volumes:
   postgres-data:
